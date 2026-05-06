@@ -536,7 +536,7 @@ const q=sel=>document.querySelector(sel);
 const qa=sel=>Array.from(document.querySelectorAll(sel));
 
 function on(sel,ev,fn){ q(sel)?.addEventListener(ev,fn); }
-function onAll(sel,ev,fn){ qa(sel).forEach(el=>el.addEventListener(ev,fn)); }
+function onAll(sel,ev,fn){ qa(sel).forEach(el=>el.addEventListener(ev,(e)=>fn(el,e))); }
 
 // ══════════════════════════════════════════════
 //  RENDER AUTH
@@ -1026,7 +1026,6 @@ function bind(){
 
   // Edit tx
   onAll('[data-edit]','click',el=>{
-    if(el.dataset.del) return;
     const tx=S.userData.transactions.find(t=>t.id===+el.dataset.edit);
     if(!tx) return;
     S.editTxId=tx.id;
@@ -1036,8 +1035,8 @@ function bind(){
   });
 
   // Del tx
-  onAll('[data-del]','click',el=>{
-    el.stopPropagation?.();
+  onAll('[data-del]','click',(el,e)=>{
+    e.stopPropagation();
     S.confirmDelete={type:'tx',id:+el.dataset.del};
     render();
   });
