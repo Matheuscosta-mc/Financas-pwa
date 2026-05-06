@@ -236,6 +236,30 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 .empty h3{font-family:'Syne',sans-serif;font-size:21px;font-weight:700;margin-bottom:8px}
 .empty p{font-size:13px;color:var(--muted);line-height:1.6}
 
+/* ── STATUS BADGES ── */
+.status-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.4px;white-space:nowrap}
+.status-badge.aberto{background:rgba(245,166,35,.13);color:var(--amb);border:1px solid rgba(245,166,35,.28)}
+.status-badge.pago{background:var(--grn-bg);color:var(--grn);border:1px solid rgba(38,212,160,.28)}
+.status-badge.vencido{background:var(--red-bg);color:var(--red);border:1px solid rgba(240,99,122,.28)}
+/* Status selector */
+.status-toggle{display:flex;gap:6px;margin-bottom:0}
+.st-btn{flex:1;padding:9px 4px;border-radius:10px;border:1.5px solid var(--border);background:transparent;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .18s;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
+.st-btn .st-ico{font-size:16px}
+.st-btn.aberto.sel{border-color:var(--amb);background:rgba(245,166,35,.12);color:var(--amb)}
+.st-btn.pago.sel{border-color:var(--grn);background:var(--grn-bg);color:var(--grn)}
+.st-btn.vencido.sel{border-color:var(--red);background:var(--red-bg);color:var(--red)}
+/* Bills summary row */
+.bills-row{display:flex;gap:8px;margin-bottom:4px}
+.bill-card{flex:1;background:var(--s1);border:1px solid var(--border);border-radius:var(--rs);padding:12px 10px;text-align:center}
+.bill-card .bc-ico{font-size:18px;margin-bottom:4px}
+.bill-card .bc-lbl{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.bill-card .bc-val{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-top:3px}
+.bill-card.aberto .bc-val{color:var(--amb)}
+.bill-card.pago .bc-val{color:var(--grn)}
+.bill-card.vencido .bc-val{color:var(--red)}
+/* tx-item vencido highlight */
+.tx-item.vencido{border-color:rgba(240,99,122,.3)}
+
 /* Install banner */
 .install-banner{margin:10px 16px 0;padding:11px 13px;background:var(--acc-bg);border:1px solid rgba(108,99,255,.28);border-radius:var(--rs);display:flex;align-items:center;gap:10px;flex-shrink:0}
 .install-banner p{flex:1;font-size:12px;color:var(--txt2);line-height:1.4}
@@ -304,18 +328,18 @@ function saveUserData(uid, d){ ss('fin_data_'+uid, d); }
 function getSampleTx(){
   const y=2026; const now=new Date();
   return [
-    {id:1,type:'income',category:'salary',    description:'Salário Maio',      amount:5800,date:`${y}-05-01`},
-    {id:2,type:'expense',category:'housing',  description:'Aluguel',           amount:1500,date:`${y}-05-02`},
-    {id:3,type:'expense',category:'food',     description:'Supermercado',      amount:320, date:`${y}-05-03`},
-    {id:4,type:'expense',category:'transport',description:'Uber',              amount:45,  date:`${y}-05-04`},
-    {id:5,type:'income', category:'freelance',description:'Projeto Web',       amount:1200,date:`${y}-05-04`},
-    {id:6,type:'expense',category:'subs',     description:'Netflix / Spotify', amount:65,  date:`${y}-05-05`},
-    {id:7,type:'expense',category:'health',   description:'Farmácia',          amount:130, date:`${y}-04-28`},
-    {id:8,type:'income', category:'salary',   description:'Salário Abril',     amount:5800,date:`${y}-04-01`},
-    {id:9,type:'expense',category:'housing',  description:'Aluguel Abril',     amount:1500,date:`${y}-04-02`},
-    {id:10,type:'expense',category:'food',    description:'Restaurante',       amount:180, date:`${y}-04-15`},
-    {id:11,type:'expense',category:'leisure', description:'Cinema',            amount:75,  date:`${y}-04-20`},
-    {id:12,type:'income', category:'invest',  description:'Dividendos',        amount:340, date:`${y}-04-25`},
+    {id:1, type:'income', category:'salary',    description:'Salário Maio',      amount:5800,date:`${y}-05-01`,status:'pago',   paymentDate:`${y}-05-01`},
+    {id:2, type:'expense',category:'housing',  description:'Aluguel',           amount:1500,date:`${y}-05-05`,status:'pago',   paymentDate:`${y}-05-05`},
+    {id:3, type:'expense',category:'food',     description:'Supermercado',      amount:320, date:`${y}-05-03`,status:'pago',   paymentDate:`${y}-05-03`},
+    {id:4, type:'expense',category:'transport',description:'Uber',              amount:45,  date:`${y}-05-04`,status:'pago',   paymentDate:`${y}-05-04`},
+    {id:5, type:'income', category:'freelance',description:'Projeto Web',       amount:1200,date:`${y}-05-04`,status:'pago',   paymentDate:`${y}-05-04`},
+    {id:6, type:'expense',category:'subs',     description:'Netflix / Spotify', amount:65,  date:`${y}-05-10`,status:'aberto', paymentDate:''},
+    {id:7, type:'expense',category:'health',   description:'Plano de Saúde',    amount:280, date:`${y}-05-08`,status:'vencido',paymentDate:''},
+    {id:8, type:'income', category:'salary',   description:'Salário Abril',     amount:5800,date:`${y}-04-01`,status:'pago',   paymentDate:`${y}-04-01`},
+    {id:9, type:'expense',category:'housing',  description:'Aluguel Abril',     amount:1500,date:`${y}-04-02`,status:'pago',   paymentDate:`${y}-04-02`},
+    {id:10,type:'expense',category:'food',     description:'Restaurante',       amount:180, date:`${y}-04-15`,status:'pago',   paymentDate:`${y}-04-15`},
+    {id:11,type:'expense',category:'leisure',  description:'Cinema',            amount:75,  date:`${y}-04-20`,status:'pago',   paymentDate:`${y}-04-20`},
+    {id:12,type:'income', category:'invest',   description:'Dividendos',        amount:340, date:`${y}-04-25`,status:'pago',   paymentDate:`${y}-04-25`},
   ];
 }
 
@@ -340,7 +364,7 @@ let S = {
   editCatId: null,
   confirmDelete: null,  // {type:'tx'|'cat', id, catType?}
   // forms
-  txForm: {type:'expense',category:'food',description:'',amount:'',date:today()},
+  txForm: {type:'expense',category:'food',description:'',amount:'',date:today(),status:'aberto',paymentDate:''},
   catForm: {type:'expense',label:'',icon:'🏠'},
   // toast
   toast: null, toastTimer: null,
@@ -435,7 +459,9 @@ function saveTx(){
   const amount=parseFloat(document.getElementById('f-amount')?.value||f.amount);
   const date=document.getElementById('f-date')?.value||f.date;
   if(!desc||isNaN(amount)||amount<=0){showToast('Preencha todos os campos corretamente.','#f0637a');return;}
-  const tx={type:f.type,category:f.category,description:desc,amount,date};
+  const status=S.txForm.type==='expense'?(document.getElementById('f-status')?.value||S.txForm.status||'aberto'):'pago';
+  const paymentDate=S.txForm.type==='expense'&&status==='pago'?(document.getElementById('f-paydate')?.value||S.txForm.paymentDate||''):'';
+  const tx={type:f.type,category:f.category,description:desc,amount,date,status,paymentDate};
   if(S.editTxId){
     S.userData.transactions=S.userData.transactions.map(t=>t.id===S.editTxId?{...tx,id:t.id}:t);
     showToast('Transação atualizada! ✏️','#6c63ff');
@@ -656,6 +682,13 @@ function renderApp(){
 
 // ── DASHBOARD ──
 function renderDashboard(txs,income,expense,expByCat,hist,maxBar){
+  const expTxs=txs.filter(t=>t.type==='expense');
+  const cntAberto=expTxs.filter(t=>t.status==='aberto').length;
+  const cntPago=expTxs.filter(t=>t.status==='pago').length;
+  const cntVencido=expTxs.filter(t=>t.status==='vencido').length;
+  const totalAberto=expTxs.filter(t=>t.status==='aberto').reduce((s,t)=>s+t.amount,0);
+  const totalVencido=expTxs.filter(t=>t.status==='vencido').reduce((s,t)=>s+t.amount,0);
+
   return `
   <div class="sec-title">Resumo</div>
   <div class="sum-grid">
@@ -664,6 +697,18 @@ function renderDashboard(txs,income,expense,expByCat,hist,maxBar){
     <div class="sum-card"><div class="sc-ico">🏦</div><div class="sc-lbl">Economizado</div><div class="sc-val" style="color:${income-expense>=0?'var(--grn)':'var(--red)'}">${fmt(Math.max(0,income-expense))}</div></div>
     <div class="sum-card"><div class="sc-ico">📅</div><div class="sc-lbl">Transações</div><div class="sc-val" style="color:var(--acc)">${txs.length}</div></div>
   </div>
+  ${expTxs.length?`
+  <div class="sec-title">Status das despesas</div>
+  <div class="bills-row">
+    <div class="bill-card aberto"><div class="bc-ico">🕐</div><div class="bc-lbl">Em aberto</div><div class="bc-val">${cntAberto}</div></div>
+    <div class="bill-card pago"><div class="bc-ico">✅</div><div class="bc-lbl">Pagas</div><div class="bc-val">${cntPago}</div></div>
+    <div class="bill-card vencido"><div class="bc-ico">⚠️</div><div class="bc-lbl">Vencidas</div><div class="bc-val">${cntVencido}</div></div>
+  </div>
+  ${totalAberto>0||totalVencido>0?`<div style="display:flex;gap:8px;margin-bottom:4px">
+    ${totalAberto>0?`<div class="bill-card aberto" style="flex:1;text-align:left;padding:10px 12px"><div class="bc-lbl">A pagar</div><div class="bc-val">${fmt(totalAberto)}</div></div>`:''}
+    ${totalVencido>0?`<div class="bill-card vencido" style="flex:1;text-align:left;padding:10px 12px"><div class="bc-lbl">Vencido</div><div class="bc-val">${fmt(totalVencido)}</div></div>`:''}
+  </div>`:''}
+  `:''}
   <div class="sec-title">Histórico 5 Meses</div>
   <div class="chart-card">
     <div class="chart-leg">
@@ -697,16 +742,23 @@ function renderDashboard(txs,income,expense,expByCat,hist,maxBar){
 // ── TRANSACTIONS ──
 function renderTransactions(txs){
   if(!txs.length) return `<div class="empty"><div class="empty-ico">🌿</div><h3>Nenhuma transação</h3><p>Toque em <strong style="color:var(--acc)">+</strong> para adicionar.</p></div>`;
+
+  const STATUS_LABEL={aberto:'Em aberto',pago:'Pago',vencido:'Vencido'};
+  const STATUS_ICO={aberto:'🕐',pago:'✅',vencido:'⚠️'};
+
   return `
   <div class="sec-title">${txs.length} transaç${txs.length===1?'ão':'ões'}</div>
   ${txs.map(tx=>{
     const cat=catInfo(tx.category,tx.type);
     const d=new Date(tx.date);
-    return `<div class="tx-item" data-edit="${tx.id}">
+    const st=tx.type==='expense'?(tx.status||'aberto'):'pago';
+    const payInfo=tx.type==='expense'&&tx.paymentDate?` · Pago em ${new Date(tx.paymentDate).toLocaleDateString('pt-BR')}`:'';
+    return `<div class="tx-item ${st==='vencido'?'vencido':''}" data-edit="${tx.id}">
       <div class="tx-ico ${tx.type}">${cat.icon}</div>
       <div class="tx-info">
         <div class="tx-desc">${esc(tx.description)}</div>
-        <div class="tx-meta">${cat.label} · ${d.toLocaleDateString('pt-BR')}</div>
+        <div class="tx-meta">${cat.label} · Venc. ${d.toLocaleDateString('pt-BR')}${payInfo}</div>
+        ${tx.type==='expense'?`<div style="margin-top:5px"><span class="status-badge ${st}">${STATUS_ICO[st]} ${STATUS_LABEL[st]}</span></div>`:''}
       </div>
       <div class="tx-right">
         <div class="tx-amt ${tx.type}">${tx.type==='income'?'+':'−'}${fmt(tx.amount)}</div>
@@ -792,7 +844,18 @@ function renderTxModal(){
       </div>
       <div class="field"><label>Descrição</label><input id="f-desc" type="text" placeholder="Ex: Supermercado" autocomplete="off" value="${esc(f.description)}"/></div>
       <div class="field"><label>Valor (R$)</label><input id="f-amount" type="number" inputmode="decimal" placeholder="0,00" min="0" step="0.01" value="${f.amount}"/></div>
-      <div class="field"><label>Data</label><input id="f-date" type="date" value="${f.date}"/></div>
+      <div class="field"><label>Data de vencimento</label><input id="f-date" type="date" value="${f.date}"/></div>
+      ${f.type==='expense'?`
+      <div class="field">
+        <label>Status</label>
+        <div class="status-toggle">
+          <button class="st-btn aberto ${(f.status||'aberto')==='aberto'?'sel':''}" data-fstatus="aberto"><span class="st-ico">🕐</span>Em aberto</button>
+          <button class="st-btn pago ${f.status==='pago'?'sel':''}" data-fstatus="pago"><span class="st-ico">✅</span>Pago</button>
+          <button class="st-btn vencido ${f.status==='vencido'?'sel':''}" data-fstatus="vencido"><span class="st-ico">⚠️</span>Vencido</button>
+        </div>
+      </div>
+      ${f.status==='pago'?`<div class="field"><label>Data de pagamento</label><input id="f-paydate" type="date" value="${f.paymentDate||f.date}"/></div>`:''}
+      `:''}
       <div class="field">
         <label>Categoria</label>
         <div class="cat-grid">
@@ -923,7 +986,7 @@ function bind(){
     } else {
       S.editTxId=null;
       const defCat=(S.userData?.categories?.expense||[])[0]?.id||'other_ex';
-      S.txForm={type:'expense',category:defCat,description:'',amount:'',date:today()};
+      S.txForm={type:'expense',category:defCat,description:'',amount:'',date:today(),status:'aberto',paymentDate:''};
       S.modal='tx';
     }
     render();
@@ -967,7 +1030,7 @@ function bind(){
     const tx=S.userData.transactions.find(t=>t.id===+el.dataset.edit);
     if(!tx) return;
     S.editTxId=tx.id;
-    S.txForm={type:tx.type,category:tx.category,description:tx.description,amount:String(tx.amount),date:tx.date};
+    S.txForm={type:tx.type,category:tx.category,description:tx.description,amount:String(tx.amount),date:tx.date,status:tx.status||'aberto',paymentDate:tx.paymentDate||''};
     S.modal='tx';
     render();
   });
@@ -992,9 +1055,15 @@ function bind(){
     S.txForm.type=t;
     const cats=S.userData?.categories[t]||[];
     S.txForm.category=cats[0]?.id||'';
+    if(t==='income'){S.txForm.status='pago';S.txForm.paymentDate='';}
     render();
   });
   onAll('[data-tcat]','click',el=>{ S.txForm.category=el.dataset.tcat; render(); });
+  onAll('[data-fstatus]','click',el=>{
+    S.txForm.status=el.dataset.fstatus;
+    if(el.dataset.fstatus==='pago'&&!S.txForm.paymentDate) S.txForm.paymentDate=today();
+    render();
+  });
 
   // ── CAT MODAL ──
   on('#catOverlay','click',e=>{ if(e.target.id==='catOverlay'){S.modal=null;render();} });
