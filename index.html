@@ -410,10 +410,12 @@ function monthHistory(){
 //  AUTH LOGIC
 // ══════════════════════════════════════════════
 function tryLogin(){
-  const {email,password}=S.authForm;
+  // Read from DOM at submit time — avoids S.authForm being stale after re-renders
+  const email=((q('#a-email')?.value||S.authForm.email)||'').trim().toLowerCase();
+  const password=(q('#a-pass')?.value||S.authForm.password)||'';
   if(!email||!password){S.authErr='Preencha e-mail e senha.';render();return;}
   const users=getUsers();
-  const user=users.find(u=>u.email.toLowerCase()===email.toLowerCase().trim()&&u.password===password);
+  const user=users.find(u=>u.email===email&&u.password===password);
   if(!user){S.authErr='E-mail ou senha incorretos.';render();return;}
   setSession(user.id);
   S.currentUser=user;
@@ -424,14 +426,18 @@ function tryLogin(){
 }
 
 function tryRegister(){
-  const {name,email,password,confirm}=S.authForm;
-  if(!name.trim()||!email.trim()||!password){S.authErr='Preencha todos os campos.';render();return;}
+  // Read from DOM at submit time for reliability
+  const name=(q('#a-name')?.value||S.authForm.name||'').trim();
+  const email=(q('#a-email')?.value||S.authForm.email||'').trim().toLowerCase();
+  const password=q('#a-pass')?.value||S.authForm.password||'';
+  const confirm=q('#a-conf')?.value||S.authForm.confirm||'';
+  if(!name||!email||!password){S.authErr='Preencha todos os campos.';render();return;}
   if(password!==confirm){S.authErr='As senhas não coincidem.';render();return;}
   if(password.length<6){S.authErr='A senha deve ter pelo menos 6 caracteres.';render();return;}
   const users=getUsers();
-  if(users.find(u=>u.email.toLowerCase()===email.toLowerCase().trim())){S.authErr='E-mail já cadastrado.';render();return;}
+  if(users.find(u=>u.email===email)){S.authErr='E-mail já cadastrado.';render();return;}
   const id='u_'+Date.now();
-  const user={id,name:name.trim(),email:email.trim().toLowerCase(),password};
+  const user={id,name,email,password};
   users.push(user);
   saveUsers(users);
   const data={transactions:getSampleTx(),categories:JSON.parse(JSON.stringify(DEFAULT_CATS))};
