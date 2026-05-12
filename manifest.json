@@ -1,7 +1,7 @@
 {
   "name": "Finanças Pessoais",
   "short_name": "Finanças",
-  "description": "Controle suas finanças pessoais",
+  "description": "Controle suas finanças pessoais com Supabase",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0b0d13",
