@@ -13,6 +13,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet"/>
+<!-- Supabase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -28,12 +30,17 @@
 }
 html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased}
 #app{height:100dvh;display:flex;flex-direction:column;max-width:480px;margin:0 auto;overflow:hidden;position:relative}
-
-/* ── SCROLLABLE CONTENT ── */
 .scroller{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .scroller::-webkit-scrollbar{display:none}
 
-/* ── AUTH SCREENS ── */
+/* ── LOADING OVERLAY ── */
+.loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:16px}
+.spinner{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--acc);border-radius:50%;animation:spin .8s linear infinite}
+.loading-screen p{font-size:13px;color:var(--muted);font-weight:500}
+.loading-btn-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(11,13,19,.6);border-radius:inherit;z-index:2}
+.loading-btn-overlay .spinner{width:20px;height:20px;border-width:2px}
+
+/* ── AUTH ── */
 .auth-wrap{min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding:32px 24px calc(32px + var(--sb));background:var(--bg);overflow-y:auto}
 .auth-wrap::-webkit-scrollbar{display:none}
 .auth-brand{text-align:center;margin-bottom:36px}
@@ -45,11 +52,14 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 .auth-card h2{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:20px}
 .field{margin-bottom:14px}
 .field label{display:block;font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
-.field input{width:100%;background:var(--s2);border:1.5px solid var(--border);border-radius:var(--rs);padding:13px 14px;color:var(--txt);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:border-color .2s;-webkit-appearance:none}
-.field input:focus{border-color:var(--acc)}
+.field input,.field select{width:100%;background:var(--s2);border:1.5px solid var(--border);border-radius:var(--rs);padding:13px 14px;color:var(--txt);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:border-color .2s;-webkit-appearance:none}
+.field input:focus,.field select:focus{border-color:var(--acc)}
 .field input::placeholder{color:var(--muted)}
-.btn-primary{width:100%;padding:14px;border-radius:var(--rs);border:none;background:linear-gradient(135deg,var(--acc),#a78bfa);color:#fff;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 6px 20px rgba(108,99,255,.35);transition:all .2s;letter-spacing:.2px}
+.field select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+.field select option{background:#1e222c}
+.btn-primary{width:100%;padding:14px;border-radius:var(--rs);border:none;background:linear-gradient(135deg,var(--acc),#a78bfa);color:#fff;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 6px 20px rgba(108,99,255,.35);transition:all .2s;letter-spacing:.2px;position:relative}
 .btn-primary:active{transform:scale(.97)}
+.btn-primary:disabled{opacity:.6;cursor:not-allowed;transform:none}
 .auth-switch{text-align:center;margin-top:18px;font-size:13px;color:var(--txt2)}
 .auth-switch button{background:none;border:none;color:var(--acc);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;padding:0}
 .auth-err{background:var(--red-bg);border:1px solid rgba(240,99,122,.3);border-radius:var(--rs);padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:14px}
@@ -115,7 +125,27 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 .chart-xl span{flex:1;text-align:center;font-size:10px;color:var(--muted);font-weight:500}
 .chart-xl span.cur{color:var(--acc);font-weight:700}
 
-/* ── CAT BREAKDOWN ── */
+/* ── STATUS BADGES & BILLS ── */
+.status-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.4px;white-space:nowrap}
+.status-badge.aberto{background:rgba(245,166,35,.13);color:var(--amb);border:1px solid rgba(245,166,35,.28)}
+.status-badge.pago{background:var(--grn-bg);color:var(--grn);border:1px solid rgba(38,212,160,.28)}
+.status-badge.vencido{background:var(--red-bg);color:var(--red);border:1px solid rgba(240,99,122,.28)}
+.status-toggle{display:flex;gap:6px;margin-bottom:0}
+.st-btn{flex:1;padding:9px 6px;border-radius:10px;border:1.5px solid var(--border);background:transparent;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;color:var(--muted);transition:all .18s}
+.st-btn.aberto.sel{border-color:var(--amb);background:rgba(245,166,35,.12);color:var(--amb)}
+.st-btn.pago.sel{border-color:var(--grn);background:var(--grn-bg);color:var(--grn)}
+.st-btn.vencido.sel{border-color:var(--red);background:var(--red-bg);color:var(--red)}
+.bills-grid{display:flex;gap:8px;margin-bottom:8px}
+.bill-card{flex:1;background:var(--s1);border:1px solid var(--border);border-radius:var(--rs);padding:12px;text-align:center}
+.bill-card .bc-ico{font-size:18px;margin-bottom:4px}
+.bill-card .bc-lbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.bill-card .bc-val{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;margin-top:3px}
+.bill-card.aberto .bc-val{color:var(--amb)}
+.bill-card.pago .bc-val{color:var(--grn)}
+.bill-card.vencido .bc-val{color:var(--red)}
+.tx-item.vencido{border-color:rgba(240,99,122,.3)}
+
+/* ── CAT LIST ── */
 .cat-list{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
 .cat-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border)}
 .cat-row:last-child{border-bottom:none}
@@ -134,7 +164,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 .tx-info{flex:1;min-width:0}
 .tx-desc{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tx-meta{font-size:11px;color:var(--muted);margin-top:2px}
-.tx-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.tx-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
 .tx-amt{font-family:'Syne',sans-serif;font-size:14px;font-weight:700}
 .tx-amt.income{color:var(--grn)}.tx-amt.expense{color:var(--red)}
 .icon-btn{background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;padding:3px;line-height:1;transition:color .15s}
@@ -157,7 +187,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 .add-cat-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;border-radius:var(--rs);border:1.5px dashed var(--border2);background:transparent;color:var(--txt2);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;width:100%;margin-top:8px;transition:all .18s}
 .add-cat-btn:active{border-color:var(--acc);color:var(--acc)}
 
-/* ── PROFILE TAB ── */
+/* ── PROFILE ── */
 .profile-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:12px}
 .prof-avatar{width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,var(--acc),#a78bfa);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:#fff;margin-bottom:14px}
 .prof-name{font-family:'Syne',sans-serif;font-size:20px;font-weight:700}
@@ -176,7 +206,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 
 /* ── FAB ── */
 .fab{position:fixed;bottom:calc(70px + var(--sb) + 14px);right:max(16px,calc(50% - 224px));width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,var(--acc),#a78bfa);border:none;color:#fff;font-size:26px;cursor:pointer;z-index:80;box-shadow:0 8px 28px rgba(108,99,255,.42);transition:transform .2s,box-shadow .2s;display:flex;align-items:center;justify-content:center}
-.fab:active{transform:scale(.91);box-shadow:0 4px 14px rgba(108,99,255,.28)}
+.fab:active{transform:scale(.91)}
 
 /* ── BOTTOM NAV ── */
 .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(13,15,22,.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;padding:8px 0 calc(8px + var(--sb));z-index:70}
@@ -184,42 +214,33 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 .nav-btn.active{color:var(--acc)}
 .nav-ico{font-size:21px}
 
-/* ── OVERLAYS & SHEETS ── */
+/* ── SHEETS & OVERLAYS ── */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:200;display:flex;align-items:flex-end;justify-content:center}
 .sheet{background:var(--s1);border:1px solid var(--border);border-radius:24px 24px 0 0;width:100%;max-width:480px;padding:0 20px calc(24px + var(--sb));max-height:93dvh;overflow-y:auto;animation:slideUp .28s cubic-bezier(.4,0,.2,1)}
 .sheet::-webkit-scrollbar{display:none}
 .sheet-handle{width:40px;height:4px;background:var(--border);border-radius:99px;margin:14px auto 16px}
 .sheet-title{font-family:'Syne',sans-serif;font-size:21px;font-weight:700;margin-bottom:18px}
-
-/* Type toggle in sheet */
 .type-toggle{display:flex;gap:8px;margin-bottom:16px}
 .type-btn{flex:1;padding:11px;border-radius:var(--rs);border:1.5px solid var(--border);background:transparent;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .18s;color:var(--muted)}
 .type-btn.income.sel{border-color:var(--grn);background:var(--grn-bg);color:var(--grn)}
 .type-btn.expense.sel{border-color:var(--red);background:var(--red-bg);color:var(--red)}
-
-/* Category grid in sheet */
 .cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .cat-opt{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;background:var(--s2);border:1.5px solid var(--border);border-radius:var(--rs);cursor:pointer;transition:all .18s;font-family:'DM Sans',sans-serif}
 .cat-opt .co-ico{font-size:22px}
 .cat-opt .co-lbl{font-size:9px;color:var(--muted);font-weight:600;letter-spacing:.3px;text-align:center}
 .cat-opt.sel{border-color:var(--acc);background:var(--acc-bg)}
 .cat-opt.sel .co-lbl{color:var(--acc)}
-
-/* Emoji picker */
 .emoji-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;max-height:180px;overflow-y:auto;padding:4px 2px}
 .emoji-grid::-webkit-scrollbar{display:none}
 .em-btn{width:100%;aspect-ratio:1;border-radius:10px;border:1.5px solid var(--border);background:var(--s2);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .em-btn.sel{border-color:var(--acc);background:var(--acc-bg)}
 .em-btn:active{transform:scale(.88)}
-
-/* Sheet actions */
 .sheet-actions{display:flex;gap:10px;margin-top:18px}
 .btn-cancel{flex:1;padding:13px;border-radius:var(--rs);border:1.5px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .18s}
 .btn-cancel:active{border-color:var(--txt);color:var(--txt)}
-.btn-save{flex:2;padding:13px;border-radius:var(--rs);border:none;background:linear-gradient(135deg,var(--acc),#a78bfa);color:#fff;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(108,99,255,.3);transition:all .18s}
+.btn-save{flex:2;padding:13px;border-radius:var(--rs);border:none;background:linear-gradient(135deg,var(--acc),#a78bfa);color:#fff;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(108,99,255,.3);transition:all .18s;position:relative}
 .btn-save:active{transform:scale(.97)}
-
-/* Confirm */
+.btn-save:disabled{opacity:.6;cursor:not-allowed;transform:none}
 .confirm-box{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:24px 20px;margin:0 16px;text-align:center}
 .confirm-box h3{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:8px}
 .confirm-box p{font-size:13px;color:var(--txt2);margin-bottom:22px;line-height:1.6}
@@ -227,164 +248,112 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font
 .btn-keep{flex:1;padding:13px;border-radius:var(--rs);border:1.5px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer}
 .btn-remove{flex:1;padding:13px;border-radius:var(--rs);border:none;background:var(--red);color:#fff;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer}
 
-/* Toast */
+/* ── TOAST & MISC ── */
 .toast{position:fixed;top:calc(14px + var(--st));left:50%;transform:translateX(-50%);padding:11px 22px;border-radius:99px;font-size:13px;font-weight:700;color:#fff;z-index:999;white-space:nowrap;animation:toastIn .3s cubic-bezier(.4,0,.2,1);box-shadow:0 8px 24px rgba(0,0,0,.4)}
-
-/* Empty */
 .empty{text-align:center;padding:52px 24px}
 .empty-ico{font-size:50px;margin-bottom:14px}
 .empty h3{font-family:'Syne',sans-serif;font-size:21px;font-weight:700;margin-bottom:8px}
 .empty p{font-size:13px;color:var(--muted);line-height:1.6}
-
-/* ── STATUS BADGES ── */
-.status-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;font-size:10px;font-weight:700;letter-spacing:.4px;white-space:nowrap}
-.status-badge.aberto{background:rgba(245,166,35,.13);color:var(--amb);border:1px solid rgba(245,166,35,.28)}
-.status-badge.pago{background:var(--grn-bg);color:var(--grn);border:1px solid rgba(38,212,160,.28)}
-.status-badge.vencido{background:var(--red-bg);color:var(--red);border:1px solid rgba(240,99,122,.28)}
-/* Status selector */
-.status-toggle{display:flex;gap:6px;margin-bottom:0}
-.st-btn{flex:1;padding:9px 4px;border-radius:10px;border:1.5px solid var(--border);background:transparent;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .18s;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px}
-.st-btn .st-ico{font-size:16px}
-.st-btn.aberto.sel{border-color:var(--amb);background:rgba(245,166,35,.12);color:var(--amb)}
-.st-btn.pago.sel{border-color:var(--grn);background:var(--grn-bg);color:var(--grn)}
-.st-btn.vencido.sel{border-color:var(--red);background:var(--red-bg);color:var(--red)}
-/* Bills summary row */
-.bills-row{display:flex;gap:8px;margin-bottom:4px}
-.bill-card{flex:1;background:var(--s1);border:1px solid var(--border);border-radius:var(--rs);padding:12px 10px;text-align:center}
-.bill-card .bc-ico{font-size:18px;margin-bottom:4px}
-.bill-card .bc-lbl{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
-.bill-card .bc-val{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-top:3px}
-.bill-card.aberto .bc-val{color:var(--amb)}
-.bill-card.pago .bc-val{color:var(--grn)}
-.bill-card.vencido .bc-val{color:var(--red)}
-/* tx-item vencido highlight */
-.tx-item.vencido{border-color:rgba(240,99,122,.3)}
-
-/* Install banner */
 .install-banner{margin:10px 16px 0;padding:11px 13px;background:var(--acc-bg);border:1px solid rgba(108,99,255,.28);border-radius:var(--rs);display:flex;align-items:center;gap:10px;flex-shrink:0}
 .install-banner p{flex:1;font-size:12px;color:var(--txt2);line-height:1.4}
 .install-banner strong{color:var(--acc)}
 .ib-btn{padding:7px 13px;background:var(--acc);border:none;border-radius:8px;color:#fff;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
 .ib-close{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:0 2px;line-height:1}
+.info-note{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;background:var(--acc-bg);border:1px solid rgba(108,99,255,.2);border-radius:var(--rs);font-size:12px;color:var(--txt2);line-height:1.5}
 
+@keyframes spin{to{transform:rotate(360deg)}}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
 </style>
 </head>
 <body>
 <div id="app"></div>
 <script>
-// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+//  ⚙️  CONFIGURAÇÃO SUPABASE — substitua com os seus dados
+//  Project URL e anon key estão em: Supabase → Settings → API
+// ══════════════════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://ojegwnbpmzpmvfcrmvvj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qZWd3bmJwbXpwbXZmY3JtdnZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1Njg2MDUsImV4cCI6MjA5NDE0NDYwNX0.7GPpuwcPVdNgXL-91TDWcrT65LuyNweE7RXj8U8bDYI';
+
+// ── Supabase client ──
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ══════════════════════════════════════════════════════════════════
 //  CONSTANTS
-// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
-const DEFAULT_CATS = {
-  income: [
-    {id:'salary',    label:'Salário',     icon:'💼'},
-    {id:'freelance', label:'Freelance',   icon:'💻'},
-    {id:'invest',    label:'Investimento',icon:'📈'},
-    {id:'gift',      label:'Presente',    icon:'🎁'},
-    {id:'other_in',  label:'Outros',      icon:'➕'},
-  ],
-  expense: [
-    {id:'housing',  label:'Moradia',     icon:'🏠'},
-    {id:'food',     label:'Alimentação', icon:'🍽️'},
-    {id:'transport',label:'Transporte',  icon:'🚗'},
-    {id:'health',   label:'Saúde',       icon:'🏥'},
-    {id:'education',label:'Educação',    icon:'📚'},
-    {id:'leisure',  label:'Lazer',       icon:'🎮'},
-    {id:'clothing', label:'Vestuário',   icon:'👗'},
-    {id:'subs',     label:'Assinaturas', icon:'📱'},
-    {id:'other_ex', label:'Outros',      icon:'➖'},
-  ]
-};
+const DEFAULT_CATS = [
+  // income
+  {type:'income', label:'Salário',      icon:'💼', position:0},
+  {type:'income', label:'Freelance',    icon:'💻', position:1},
+  {type:'income', label:'Investimento', icon:'📈', position:2},
+  {type:'income', label:'Presente',     icon:'🎁', position:3},
+  {type:'income', label:'Outros',       icon:'➕', position:4},
+  // expense
+  {type:'expense', label:'Moradia',     icon:'🏠', position:0},
+  {type:'expense', label:'Alimentação', icon:'🍽️', position:1},
+  {type:'expense', label:'Transporte',  icon:'🚗', position:2},
+  {type:'expense', label:'Saúde',       icon:'🏥', position:3},
+  {type:'expense', label:'Educação',    icon:'📚', position:4},
+  {type:'expense', label:'Lazer',       icon:'🎮', position:5},
+  {type:'expense', label:'Vestuário',   icon:'👗', position:6},
+  {type:'expense', label:'Assinaturas', icon:'📱', position:7},
+  {type:'expense', label:'Outros',      icon:'➖', position:8},
+];
 
 const EMOJI_LIST = ['🏠','🍽️','🚗','🏥','📚','🎮','👗','📱','✈️','🐾','💇','🎵','🎬','🏋️','💊',
   '🛒','⚡','💧','📦','🎓','💰','🎯','🔧','🛠️','🌿','🧴','🎪','🍕','☕','🍺',
   '💼','💻','📈','🎁','➕','➖','💡','🔑','📷','🎨','🧹','🛁','🧺','🚿','🌐',
   '🏦','💳','🧾','📊','💸','🤝','🎤','🎧','📺','🖥️','⌨️','🖨️','📡','🔋','💎'];
 
-// ══════════════════════════════════════════════
-//  STORAGE HELPERS
-// ══════════════════════════════════════════════
-function ls(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch{ return null; } }
-function ss(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
-
-function getUsers(){ return ls('fin_users') || []; }
-function saveUsers(u){ ss('fin_users', u); }
-function getSession(){ return ls('fin_session'); }
-function setSession(id){ ss('fin_session', id); }
-function clearSession(){ localStorage.removeItem('fin_session'); }
-
-function getUserData(uid){
-  const d = ls('fin_data_'+uid);
-  if(d) return d;
-  return { transactions: getSampleTx(), categories: JSON.parse(JSON.stringify(DEFAULT_CATS)) };
-}
-function saveUserData(uid, d){ ss('fin_data_'+uid, d); }
-
-function getSampleTx(){
-  const y=2026; const now=new Date();
-  return [
-    {id:1, type:'income', category:'salary',    description:'Salário Maio',      amount:5800,date:`${y}-05-01`,status:'pago',   paymentDate:`${y}-05-01`},
-    {id:2, type:'expense',category:'housing',  description:'Aluguel',           amount:1500,date:`${y}-05-05`,status:'pago',   paymentDate:`${y}-05-05`},
-    {id:3, type:'expense',category:'food',     description:'Supermercado',      amount:320, date:`${y}-05-03`,status:'pago',   paymentDate:`${y}-05-03`},
-    {id:4, type:'expense',category:'transport',description:'Uber',              amount:45,  date:`${y}-05-04`,status:'pago',   paymentDate:`${y}-05-04`},
-    {id:5, type:'income', category:'freelance',description:'Projeto Web',       amount:1200,date:`${y}-05-04`,status:'pago',   paymentDate:`${y}-05-04`},
-    {id:6, type:'expense',category:'subs',     description:'Netflix / Spotify', amount:65,  date:`${y}-05-10`,status:'aberto', paymentDate:''},
-    {id:7, type:'expense',category:'health',   description:'Plano de Saúde',    amount:280, date:`${y}-05-08`,status:'vencido',paymentDate:''},
-    {id:8, type:'income', category:'salary',   description:'Salário Abril',     amount:5800,date:`${y}-04-01`,status:'pago',   paymentDate:`${y}-04-01`},
-    {id:9, type:'expense',category:'housing',  description:'Aluguel Abril',     amount:1500,date:`${y}-04-02`,status:'pago',   paymentDate:`${y}-04-02`},
-    {id:10,type:'expense',category:'food',     description:'Restaurante',       amount:180, date:`${y}-04-15`,status:'pago',   paymentDate:`${y}-04-15`},
-    {id:11,type:'expense',category:'leisure',  description:'Cinema',            amount:75,  date:`${y}-04-20`,status:'pago',   paymentDate:`${y}-04-20`},
-    {id:12,type:'income', category:'invest',   description:'Dividendos',        amount:340, date:`${y}-04-25`,status:'pago',   paymentDate:`${y}-04-25`},
-  ];
-}
-
-// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 //  STATE
-// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 let S = {
-  // auth
-  screen: 'login',   // login | register | app
+  screen: 'boot',
+  loading: true,
+  saving: false,
   authErr: '',
   authForm: {name:'',email:'',password:'',confirm:''},
-  currentUser: null,
-  userData: null,
-  // app
+  currentUser: null,   // {id, name, email}
+  userData: null,      // {categories:{income:[],expense:[]}, transactions:[]}
   tab: 'dashboard',
   month: new Date().getMonth()+1,
   year: new Date().getFullYear(),
-  catFilter: 'expense',  // for categories tab
-  // modals
-  modal: null,   // null | 'tx' | 'cat' | 'profile'
+  catFilter: 'expense',
+  modal: null,
   editTxId: null,
   editCatId: null,
-  confirmDelete: null,  // {type:'tx'|'cat', id, catType?}
-  // forms
-  txForm: {type:'expense',category:'food',description:'',amount:'',date:today(),status:'aberto',paymentDate:''},
+  confirmDelete: null,
+  txForm: {type:'expense',category:'',description:'',amount:'',date:today(),status:'aberto',paymentDate:''},
   catForm: {type:'expense',label:'',icon:'🏠'},
-  // toast
   toast: null, toastTimer: null,
-  // pwa
   showInstall: false, deferredPrompt: null,
 };
 
+// ══════════════════════════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════════════════════════
 function today(){ return new Date().toISOString().slice(0,10); }
 function fmt(v){ return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0); }
-function initials(name){ return name ? name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase() : '?'; }
+function initials(name){ return (name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+const q  = sel => document.querySelector(sel);
+const qa = sel => Array.from(document.querySelectorAll(sel));
+function on(sel,ev,fn){ q(sel)?.addEventListener(ev,fn); }
+function onAll(sel,ev,fn){ qa(sel).forEach(el => el.addEventListener(ev,(e)=>fn(el,e))); }
 
 function catInfo(id, type){
-  if(!S.userData) return {label:id,icon:'•'};
-  const list = type==='income' ? S.userData.categories.income : S.userData.categories.expense;
-  return list.find(c=>c.id===id) || {label:id,icon:'•'};
+  if(!S.userData) return {label:'',icon:'•'};
+  const list = S.userData.categories[type] || [];
+  return list.find(c=>c.id===id) || {label:'Sem categoria',icon:'•'};
 }
 
 function filteredTx(){
   return (S.userData?.transactions||[]).filter(t=>{
-    const d=new Date(t.date);
+    const d = new Date(t.date);
     return d.getMonth()+1===S.month && d.getFullYear()===S.year;
   });
 }
@@ -398,158 +367,273 @@ function monthHistory(){
       return d.getMonth()+1===m && d.getFullYear()===y;
     });
     return {
-      label:MONTHS[m-1],
-      income:txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0),
-      expense:txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0),
-      active:m===S.month&&y===S.year,
+      label: MONTHS[m-1],
+      income:  txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0),
+      expense: txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0),
+      active: m===S.month && y===S.year,
     };
   });
 }
 
-// ══════════════════════════════════════════════
-//  AUTH LOGIC
-// ══════════════════════════════════════════════
-function tryLogin(){
-  // Read from DOM at submit time — avoids S.authForm being stale after re-renders
-  const email=((q('#a-email')?.value||S.authForm.email)||'').trim().toLowerCase();
-  const password=(q('#a-pass')?.value||S.authForm.password)||'';
-  if(!email||!password){S.authErr='Preencha e-mail e senha.';render();return;}
-  const users=getUsers();
-  const user=users.find(u=>u.email===email&&u.password===password);
-  if(!user){S.authErr='E-mail ou senha incorretos.';render();return;}
-  setSession(user.id);
-  S.currentUser=user;
-  S.userData=getUserData(user.id);
-  S.screen='app';
-  S.authErr='';
-  render();
+// Map Supabase row → local transaction object
+function mapTx(row){
+  return {
+    id:          row.id,
+    type:        row.type,
+    category:    row.category_id || '',
+    description: row.description,
+    amount:      parseFloat(row.amount),
+    date:        row.date,
+    status:      row.status || 'aberto',
+    paymentDate: row.payment_date || '',
+  };
 }
 
-function tryRegister(){
-  // Read from DOM at submit time for reliability
-  const name=(q('#a-name')?.value||S.authForm.name||'').trim();
-  const email=(q('#a-email')?.value||S.authForm.email||'').trim().toLowerCase();
-  const password=q('#a-pass')?.value||S.authForm.password||'';
-  const confirm=q('#a-conf')?.value||S.authForm.confirm||'';
-  if(!name||!email||!password){S.authErr='Preencha todos os campos.';render();return;}
-  if(password!==confirm){S.authErr='As senhas não coincidem.';render();return;}
-  if(password.length<6){S.authErr='A senha deve ter pelo menos 6 caracteres.';render();return;}
-  const users=getUsers();
-  if(users.find(u=>u.email===email)){S.authErr='E-mail já cadastrado.';render();return;}
-  const id='u_'+Date.now();
-  const user={id,name,email,password};
-  users.push(user);
-  saveUsers(users);
-  const data={transactions:getSampleTx(),categories:JSON.parse(JSON.stringify(DEFAULT_CATS))};
-  saveUserData(id,data);
-  setSession(id);
-  S.currentUser=user; S.userData=data;
+// Map Supabase row → local category object
+function mapCat(row){
+  return { id: row.id, label: row.label, icon: row.icon };
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SUPABASE — DATA LAYER
+// ══════════════════════════════════════════════════════════════════
+async function loadUserData(userId){
+  const [catRes, txRes] = await Promise.all([
+    sb.from('categories').select('*').eq('user_id', userId).order('position').order('created_at'),
+    sb.from('transactions').select('*').eq('user_id', userId).order('date', {ascending:false}).order('created_at', {ascending:false}),
+  ]);
+  const cats = catRes.data || [];
+  const txs  = txRes.data  || [];
+  S.userData = {
+    categories: {
+      income:  cats.filter(c=>c.type==='income').map(mapCat),
+      expense: cats.filter(c=>c.type==='expense').map(mapCat),
+    },
+    transactions: txs.map(mapTx),
+  };
+}
+
+async function insertDefaultCategories(userId){
+  const rows = DEFAULT_CATS.map(c => ({...c, user_id: userId}));
+  const { error } = await sb.from('categories').insert(rows);
+  if(error) console.error('Default categories error:', error);
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  AUTH
+// ══════════════════════════════════════════════════════════════════
+async function tryLogin(){
+  const email    = (q('#a-email')?.value || '').trim().toLowerCase();
+  const password = (q('#a-pass')?.value  || '');
+  if(!email || !password){ S.authErr='Preencha e-mail e senha.'; render(); return; }
+
+  S.saving=true; render();
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  S.saving=false;
+
+  if(error){
+    S.authErr = error.message.includes('Invalid') || error.message.includes('invalid')
+      ? 'E-mail ou senha incorretos.'
+      : error.message;
+    render(); return;
+  }
+
+  S.currentUser = { id: data.user.id, name: data.user.user_metadata?.name || '', email: data.user.email };
+  await loadUserData(data.user.id);
   S.screen='app'; S.authErr=''; render();
-  showToast('Bem-vindo(a), '+user.name.split(' ')[0]+'! 🎉','#26d4a0');
 }
 
-function logout(){
-  clearSession();
+async function tryRegister(){
+  const name     = (q('#a-name')?.value  || '').trim();
+  const email    = (q('#a-email')?.value || '').trim().toLowerCase();
+  const password = (q('#a-pass')?.value  || '');
+  const confirm  = (q('#a-conf')?.value  || '');
+
+  if(!name || !email || !password){ S.authErr='Preencha todos os campos.'; render(); return; }
+  if(password !== confirm){ S.authErr='As senhas não coincidem.'; render(); return; }
+  if(password.length < 6){ S.authErr='A senha deve ter pelo menos 6 caracteres.'; render(); return; }
+
+  S.saving=true; render();
+  const { data, error } = await sb.auth.signUp({
+    email, password, options: { data: { name } }
+  });
+  S.saving=false;
+
+  if(error){
+    S.authErr = error.message.includes('already') ? 'E-mail já cadastrado.' : error.message;
+    render(); return;
+  }
+
+  if(!data.user){ S.authErr='Erro ao criar conta. Tente novamente.'; render(); return; }
+
+  // Insert default categories for new user
+  await insertDefaultCategories(data.user.id);
+
+  S.currentUser = { id: data.user.id, name, email };
+  await loadUserData(data.user.id);
+  S.screen='app'; S.authErr=''; render();
+  showToast('Bem-vindo(a), '+name.split(' ')[0]+'! 🎉','#26d4a0');
+}
+
+async function doLogout(){
+  await sb.auth.signOut();
   S.currentUser=null; S.userData=null;
   S.screen='login'; S.authForm={name:'',email:'',password:'',confirm:''};
   S.modal=null; S.tab='dashboard';
   render();
 }
 
-// ══════════════════════════════════════════════
-//  TX LOGIC
-// ══════════════════════════════════════════════
-function saveTx(){
-  const f=S.txForm;
-  const desc=(document.getElementById('f-desc')?.value||f.description).trim();
-  const amount=parseFloat(document.getElementById('f-amount')?.value||f.amount);
-  const date=document.getElementById('f-date')?.value||f.date;
-  if(!desc||isNaN(amount)||amount<=0){showToast('Preencha todos os campos corretamente.','#f0637a');return;}
-  const status=S.txForm.type==='expense'?(document.getElementById('f-status')?.value||S.txForm.status||'aberto'):'pago';
-  const paymentDate=S.txForm.type==='expense'&&status==='pago'?(document.getElementById('f-paydate')?.value||S.txForm.paymentDate||''):'';
-  const tx={type:f.type,category:f.category,description:desc,amount,date,status,paymentDate};
+// ══════════════════════════════════════════════════════════════════
+//  TRANSACTIONS
+// ══════════════════════════════════════════════════════════════════
+async function saveTxData(){
+  const f      = S.txForm;
+  const desc   = (q('#f-desc')?.value   || f.description).trim();
+  const amount = parseFloat(q('#f-amount')?.value || f.amount);
+  const date   = q('#f-date')?.value    || f.date;
+  const status = f.type==='expense' ? (q('#f-status')?.value || f.status || 'aberto') : 'pago';
+  const payDate = f.type==='expense' && status==='pago' ? (q('#f-paydate')?.value || f.paymentDate || null) : null;
+
+  if(!desc || isNaN(amount) || amount<=0){ showToast('Preencha todos os campos corretamente.','#f0637a'); return; }
+
+  S.saving=true; render();
+
+  const row = {
+    user_id:      S.currentUser.id,
+    type:         f.type,
+    category_id:  f.category || null,
+    description:  desc,
+    amount,
+    date,
+    status,
+    payment_date: payDate || null,
+  };
+
   if(S.editTxId){
-    S.userData.transactions=S.userData.transactions.map(t=>t.id===S.editTxId?{...tx,id:t.id}:t);
+    const { error } = await sb.from('transactions').update(row).eq('id', S.editTxId);
+    if(error){ S.saving=false; showToast('Erro ao atualizar: '+error.message,'#f0637a'); return; }
+    S.userData.transactions = S.userData.transactions.map(t =>
+      t.id===S.editTxId ? mapTx({...row, id:S.editTxId}) : t
+    );
     showToast('Transação atualizada! ✏️','#6c63ff');
   } else {
-    S.userData.transactions=[{...tx,id:Date.now()},...S.userData.transactions];
+    const { data, error } = await sb.from('transactions').insert(row).select().single();
+    if(error){ S.saving=false; showToast('Erro ao salvar: '+error.message,'#f0637a'); return; }
+    S.userData.transactions = [mapTx(data), ...S.userData.transactions];
     showToast('Adicionado! ✅','#26d4a0');
   }
-  saveUserData(S.currentUser.id,S.userData);
-  S.modal=null; S.editTxId=null; render();
+
+  S.saving=false; S.modal=null; S.editTxId=null; render();
 }
 
-function deleteTx(id){
-  S.userData.transactions=S.userData.transactions.filter(t=>t.id!==id);
-  saveUserData(S.currentUser.id,S.userData);
-  S.confirmDelete=null;
+async function deleteTxById(id){
+  S.saving=true; render();
+  const { error } = await sb.from('transactions').delete().eq('id', id);
+  if(error){ S.saving=false; showToast('Erro ao remover: '+error.message,'#f0637a'); return; }
+  S.userData.transactions = S.userData.transactions.filter(t=>t.id!==id);
+  S.saving=false; S.confirmDelete=null;
   showToast('Removido.','#f5a623'); render();
 }
 
-// ══════════════════════════════════════════════
-//  CATEGORY LOGIC
-// ══════════════════════════════════════════════
-function saveCat(){
-  const label=(document.getElementById('cat-label')?.value||S.catForm.label).trim();
-  const icon=S.catForm.icon;
-  const type=S.catForm.type;
-  if(!label){showToast('Informe o nome da categoria.','#f0637a');return;}
-  const list=S.userData.categories[type];
+// ══════════════════════════════════════════════════════════════════
+//  CATEGORIES
+// ══════════════════════════════════════════════════════════════════
+async function saveCatData(){
+  const label = (q('#cat-label')?.value || S.catForm.label).trim();
+  const icon  = S.catForm.icon;
+  const type  = S.catForm.type;
+  if(!label){ showToast('Informe o nome da categoria.','#f0637a'); return; }
+
+  S.saving=true; render();
+
   if(S.editCatId){
-    const idx=list.findIndex(c=>c.id===S.editCatId);
-    if(idx>-1) list[idx]={...list[idx],label,icon};
+    const { error } = await sb.from('categories').update({label, icon}).eq('id', S.editCatId);
+    if(error){ S.saving=false; showToast('Erro: '+error.message,'#f0637a'); return; }
+    const list = S.userData.categories[type];
+    const idx  = list.findIndex(c=>c.id===S.editCatId);
+    if(idx>-1) list[idx] = {id:S.editCatId, label, icon};
     showToast('Categoria atualizada! ✏️','#6c63ff');
   } else {
-    const newId='cat_'+Date.now();
-    list.push({id:newId,label,icon});
+    const pos = (S.userData.categories[type]||[]).length;
+    const { data, error } = await sb.from('categories')
+      .insert({user_id:S.currentUser.id, type, label, icon, position:pos})
+      .select().single();
+    if(error){ S.saving=false; showToast('Erro: '+error.message,'#f0637a'); return; }
+    S.userData.categories[type].push(mapCat(data));
     showToast('Categoria criada! ✅','#26d4a0');
   }
-  saveUserData(S.currentUser.id,S.userData);
-  S.modal=null; S.editCatId=null; render();
+
+  S.saving=false; S.modal=null; S.editCatId=null; render();
 }
 
-function deleteCat(id,type){
-  const list=S.userData.categories[type];
-  if(list.length<=1){showToast('Mantenha ao menos 1 categoria.','#f0637a');S.confirmDelete=null;render();return;}
-  S.userData.categories[type]=list.filter(c=>c.id!==id);
-  // remap orphan transactions
-  S.userData.transactions=S.userData.transactions.map(t=>{
-    if(t.type===type&&t.category===id){
-      const fallback=S.userData.categories[type][0];
-      return {...t,category:fallback.id};
-    }
-    return t;
-  });
-  saveUserData(S.currentUser.id,S.userData);
-  S.confirmDelete=null;
+async function deleteCatById(id, type){
+  const list = S.userData.categories[type] || [];
+  if(list.length <= 1){ showToast('Mantenha ao menos 1 categoria.','#f0637a'); S.confirmDelete=null; render(); return; }
+
+  S.saving=true; render();
+  const { error } = await sb.from('categories').delete().eq('id', id);
+  if(error){ S.saving=false; showToast('Erro: '+error.message,'#f0637a'); return; }
+
+  S.userData.categories[type] = list.filter(c=>c.id!==id);
+  // Reclassify orphan transactions locally (DB does SET NULL via FK)
+  const fallback = (S.userData.categories[type][0]||{}).id || null;
+  S.userData.transactions = S.userData.transactions.map(t =>
+    t.type===type && t.category===id ? {...t, category:fallback} : t
+  );
+  S.saving=false; S.confirmDelete=null;
   showToast('Categoria removida.','#f5a623'); render();
 }
 
-// ══════════════════════════════════════════════
-//  TOAST
-// ══════════════════════════════════════════════
-function showToast(msg,color='#26d4a0'){
-  if(S.toastTimer) clearTimeout(S.toastTimer);
-  S.toast={msg,color};
+// ══════════════════════════════════════════════════════════════════
+//  PROFILE
+// ══════════════════════════════════════════════════════════════════
+async function saveProfileData(){
+  const name  = (q('#p-name')?.value  || '').trim();
+  const email = (q('#p-email')?.value || '').trim().toLowerCase();
+  const pass  = (q('#p-pass')?.value  || '');
+
+  if(!name || !email){ showToast('Nome e e-mail são obrigatórios.','#f0637a'); return; }
+
+  S.saving=true; render();
+
+  // Update user metadata (name)
+  const updates = { data: { name } };
+  if(email !== S.currentUser.email) updates.email = email;
+  if(pass) updates.password = pass;
+
+  const { data, error } = await sb.auth.updateUser(updates);
+  if(error){ S.saving=false; showToast('Erro: '+error.message,'#f0637a'); return; }
+
+  // Update profiles table
+  await sb.from('profiles').upsert({ id: S.currentUser.id, name });
+
+  S.currentUser = { ...S.currentUser, name, email: data.user.email };
+  S.saving=false; S.modal=null;
+
+  if(email !== S.currentUser.email && updates.email){
+    showToast('Confirme o novo e-mail na sua caixa de entrada.','#f5a623');
+  } else {
+    showToast('Perfil atualizado! ✅','#26d4a0');
+  }
   render();
-  S.toastTimer=setTimeout(()=>{S.toast=null;render();},2700);
 }
 
-// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════════════════════════════
+function showToast(msg, color='#26d4a0'){
+  if(S.toastTimer) clearTimeout(S.toastTimer);
+  S.toast = {msg, color};
+  render();
+  S.toastTimer = setTimeout(()=>{ S.toast=null; render(); }, 2800);
+}
+
+// ══════════════════════════════════════════════════════════════════
 //  RENDER HELPERS
-// ══════════════════════════════════════════════
-const q=sel=>document.querySelector(sel);
-const qa=sel=>Array.from(document.querySelectorAll(sel));
-
-function on(sel,ev,fn){ q(sel)?.addEventListener(ev,fn); }
-function onAll(sel,ev,fn){ qa(sel).forEach(el=>el.addEventListener(ev,(e)=>fn(el,e))); }
-
-// ══════════════════════════════════════════════
-//  RENDER AUTH
-// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 function renderAuth(){
-  const f=S.authForm;
-  const isLogin=S.screen==='login';
+  const f = S.authForm;
+  const isLogin = S.screen==='login';
   return `
   <div class="auth-wrap">
     <div class="auth-brand">
@@ -559,12 +643,14 @@ function renderAuth(){
     </div>
     <div class="auth-card">
       <h2>${isLogin?'Entrar na conta':'Criar conta'}</h2>
-      ${S.authErr?`<div class="auth-err">${S.authErr}</div>`:''}
+      ${S.authErr?`<div class="auth-err">${esc(S.authErr)}</div>`:''}
       ${!isLogin?`<div class="field"><label>Nome completo</label><input id="a-name" type="text" placeholder="João Silva" autocomplete="name" value="${esc(f.name)}"/></div>`:''}
       <div class="field"><label>E-mail</label><input id="a-email" type="email" inputmode="email" placeholder="seu@email.com" autocomplete="email" value="${esc(f.email)}"/></div>
-      <div class="field"><label>Senha</label><input id="a-pass" type="password" placeholder="••••••••" autocomplete="${isLogin?'current-password':'new-password'}" value="${esc(f.password)}"/></div>
-      ${!isLogin?`<div class="field"><label>Confirmar senha</label><input id="a-conf" type="password" placeholder="••••••••" autocomplete="new-password" value="${esc(f.confirm)}"/></div>`:''}
-      <button class="btn-primary" id="authSubmit">${isLogin?'Entrar':'Criar conta'}</button>
+      <div class="field"><label>Senha</label><input id="a-pass" type="password" placeholder="••••••••" autocomplete="${isLogin?'current-password':'new-password'}"/></div>
+      ${!isLogin?`<div class="field"><label>Confirmar senha</label><input id="a-conf" type="password" placeholder="••••••••" autocomplete="new-password"/></div>`:''}
+      <button class="btn-primary" id="authSubmit" ${S.saving?'disabled':''}>
+        ${S.saving?'<span style="opacity:.7">Aguarde...</span>':(isLogin?'Entrar':'Criar conta')}
+      </button>
     </div>
     <div class="auth-switch">
       ${isLogin?'Não tem conta?':'Já tem conta?'}
@@ -573,44 +659,34 @@ function renderAuth(){
   </div>`;
 }
 
-function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
-
-// ══════════════════════════════════════════════
-//  RENDER APP
-// ══════════════════════════════════════════════
 function renderApp(){
-  const txs=filteredTx();
-  const income=txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
-  const expense=txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
-  const balance=income-expense;
-  const savePct=income>0?Math.max(0,Math.min(100,(balance/income)*100)):0;
-  const hist=monthHistory();
-  const maxBar=Math.max(...hist.map(h=>Math.max(h.income,h.expense)),1);
-  const user=S.currentUser;
-
-  const expByCat=(S.userData?.categories?.expense||[]).map(cat=>({
-    ...cat,
-    total:txs.filter(t=>t.type==='expense'&&t.category===cat.id).reduce((s,t)=>s+t.amount,0)
+  const txs    = filteredTx();
+  const income  = txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const expense = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const balance = income - expense;
+  const savePct = income>0 ? Math.max(0,Math.min(100,(balance/income)*100)) : 0;
+  const hist    = monthHistory();
+  const maxBar  = Math.max(...hist.map(h=>Math.max(h.income,h.expense)),1);
+  const expByCat = (S.userData?.categories?.expense||[]).map(cat=>({
+    ...cat, total: txs.filter(t=>t.type==='expense'&&t.category===cat.id).reduce((s,t)=>s+t.amount,0)
   })).filter(c=>c.total>0).sort((a,b)=>b.total-a.total);
-
-  const sortedTxs=[...txs].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const sortedTxs = [...txs].sort((a,b)=>new Date(b.date)-new Date(a.date));
 
   return `
-  <!-- HEADER -->
   <div class="header">
     <div class="header-row">
       <div class="logo">Fina<em>nças</em></div>
       <div class="header-right">
-        ${S.tab!=='categories'&&S.tab!=='profile'?`
+        ${S.tab==='dashboard'||S.tab==='transactions'?`
         <div class="month-nav">
           <button id="prevM">&#8249;</button>
           <span class="month-label">${MONTHS[S.month-1]} ${S.year}</span>
           <button id="nextM">&#8250;</button>
         </div>`:
-        `<div class="month-label" style="min-width:0;color:var(--txt2);font-size:12px">${
+        `<span class="month-label" style="min-width:0;color:var(--txt2);font-size:12px">${
           S.tab==='categories'?'Categorias':'Perfil'
-        }</div>`}
-        <button class="avatar-btn" id="profileBtn">${initials(user?.name)}</button>
+        }</span>`}
+        <button class="avatar-btn" id="profileBtn">${initials(S.currentUser?.name)}</button>
       </div>
     </div>
   </div>
@@ -622,20 +698,13 @@ function renderApp(){
     <button class="ib-close" id="closeBanner">✕</button>
   </div>`:''}
 
-  <!-- BALANCE CARD (only dashboard/transactions) -->
   ${S.tab==='dashboard'||S.tab==='transactions'?`
   <div class="bal-card">
     <div class="bal-lbl">Saldo do Mês</div>
     <div class="bal-amt ${balance>=0?'pos':'neg'}">${fmt(balance)}</div>
     <div class="bal-row">
-      <div class="bal-item">
-        <div class="bi-lbl">Receitas</div>
-        <div class="bi-val inc">${fmt(income)}</div>
-      </div>
-      <div class="bal-item" style="padding-left:16px">
-        <div class="bi-lbl">Despesas</div>
-        <div class="bi-val exp">${fmt(expense)}</div>
-      </div>
+      <div class="bal-item"><div class="bi-lbl">Receitas</div><div class="bi-val inc">${fmt(income)}</div></div>
+      <div class="bal-item" style="padding-left:16px"><div class="bi-lbl">Despesas</div><div class="bi-val exp">${fmt(expense)}</div></div>
     </div>
     <div class="save-row">
       <div class="save-hd">
@@ -646,15 +715,13 @@ function renderApp(){
     </div>
   </div>`:''}
 
-  <!-- TABS -->
   <div class="tabs">
-    <button class="tab ${S.tab==='dashboard'?'active':''}" data-tab="dashboard">📊 Visão</button>
+    <button class="tab ${S.tab==='dashboard'?'active':''}"   data-tab="dashboard">📊 Visão</button>
     <button class="tab ${S.tab==='transactions'?'active':''}" data-tab="transactions">💳 Extrato</button>
-    <button class="tab ${S.tab==='categories'?'active':''}" data-tab="categories">🏷️ Categorias</button>
-    <button class="tab ${S.tab==='profile'?'active':''}" data-tab="profile">👤 Perfil</button>
+    <button class="tab ${S.tab==='categories'?'active':''}"   data-tab="categories">🏷️ Cats</button>
+    <button class="tab ${S.tab==='profile'?'active':''}"      data-tab="profile">👤 Perfil</button>
   </div>
 
-  <!-- CONTENT -->
   <div class="scroller">
     <div class="content">
       ${S.tab==='dashboard'?renderDashboard(txs,income,expense,expByCat,hist,maxBar):''}
@@ -664,37 +731,32 @@ function renderApp(){
     </div>
   </div>
 
-  <!-- FAB (not on profile) -->
   ${S.tab!=='profile'?`<button class="fab" id="fabBtn">${S.tab==='categories'?'＋':'+'}</button>`:''}
 
-  <!-- BOTTOM NAV -->
   <div class="bottom-nav">
-    <button class="nav-btn ${S.tab==='dashboard'?'active':''}" data-tab="dashboard"><span class="nav-ico">📊</span>Visão</button>
+    <button class="nav-btn ${S.tab==='dashboard'?'active':''}"   data-tab="dashboard"><span class="nav-ico">📊</span>Visão</button>
     <button class="nav-btn ${S.tab==='transactions'?'active':''}" data-tab="transactions"><span class="nav-ico">💳</span>Extrato</button>
-    <button class="nav-btn ${S.tab==='categories'?'active':''}" data-tab="categories"><span class="nav-ico">🏷️</span>Categorias</button>
-    <button class="nav-btn ${S.tab==='profile'?'active':''}" data-tab="profile"><span class="nav-ico">👤</span>Perfil</button>
+    <button class="nav-btn ${S.tab==='categories'?'active':''}"   data-tab="categories"><span class="nav-ico">🏷️</span>Cats</button>
+    <button class="nav-btn ${S.tab==='profile'?'active':''}"      data-tab="profile"><span class="nav-ico">👤</span>Perfil</button>
   </div>
 
-  <!-- MODALS -->
   ${S.modal==='tx'?renderTxModal():''}
   ${S.modal==='cat'?renderCatModal():''}
   ${S.modal==='profile'?renderProfileModal():''}
   ${S.confirmDelete?renderConfirm():''}
-
-  <!-- TOAST -->
-  ${S.toast?`<div class="toast" style="background:${S.toast.color}">${S.toast.msg}</div>`:''}
+  ${S.saving?`<div class="toast" style="background:#6c63ff">⏳ Salvando...</div>`:''}
+  ${S.toast&&!S.saving?`<div class="toast" style="background:${S.toast.color}">${S.toast.msg}</div>`:''}
   `;
 }
 
-// ── DASHBOARD ──
+// ── Dashboard ──
 function renderDashboard(txs,income,expense,expByCat,hist,maxBar){
-  const expTxs=txs.filter(t=>t.type==='expense');
-  const cntAberto=expTxs.filter(t=>t.status==='aberto').length;
-  const cntPago=expTxs.filter(t=>t.status==='pago').length;
-  const cntVencido=expTxs.filter(t=>t.status==='vencido').length;
-  const totalAberto=expTxs.filter(t=>t.status==='aberto').reduce((s,t)=>s+t.amount,0);
-  const totalVencido=expTxs.filter(t=>t.status==='vencido').reduce((s,t)=>s+t.amount,0);
-
+  const expTxs = txs.filter(t=>t.type==='expense');
+  const cntAberto  = expTxs.filter(t=>t.status==='aberto').length;
+  const cntPago    = expTxs.filter(t=>t.status==='pago').length;
+  const cntVencido = expTxs.filter(t=>t.status==='vencido').length;
+  const totAberto  = expTxs.filter(t=>t.status==='aberto').reduce((s,t)=>s+t.amount,0);
+  const totVencido = expTxs.filter(t=>t.status==='vencido').reduce((s,t)=>s+t.amount,0);
   return `
   <div class="sec-title">Resumo</div>
   <div class="sum-grid">
@@ -704,17 +766,16 @@ function renderDashboard(txs,income,expense,expByCat,hist,maxBar){
     <div class="sum-card"><div class="sc-ico">📅</div><div class="sc-lbl">Transações</div><div class="sc-val" style="color:var(--acc)">${txs.length}</div></div>
   </div>
   ${expTxs.length?`
-  <div class="sec-title">Status das despesas</div>
-  <div class="bills-row">
-    <div class="bill-card aberto"><div class="bc-ico">🕐</div><div class="bc-lbl">Em aberto</div><div class="bc-val">${cntAberto}</div></div>
+  <div class="sec-title">Status das Despesas</div>
+  <div class="bills-grid">
+    <div class="bill-card aberto"><div class="bc-ico">🕐</div><div class="bc-lbl">Em Aberto</div><div class="bc-val">${cntAberto}</div></div>
     <div class="bill-card pago"><div class="bc-ico">✅</div><div class="bc-lbl">Pagas</div><div class="bc-val">${cntPago}</div></div>
     <div class="bill-card vencido"><div class="bc-ico">⚠️</div><div class="bc-lbl">Vencidas</div><div class="bc-val">${cntVencido}</div></div>
   </div>
-  ${totalAberto>0||totalVencido>0?`<div style="display:flex;gap:8px;margin-bottom:4px">
-    ${totalAberto>0?`<div class="bill-card aberto" style="flex:1;text-align:left;padding:10px 12px"><div class="bc-lbl">A pagar</div><div class="bc-val">${fmt(totalAberto)}</div></div>`:''}
-    ${totalVencido>0?`<div class="bill-card vencido" style="flex:1;text-align:left;padding:10px 12px"><div class="bc-lbl">Vencido</div><div class="bc-val">${fmt(totalVencido)}</div></div>`:''}
+  <div class="bills-grid">
+    ${totAberto>0?`<div class="bill-card aberto" style="flex:1;text-align:left;padding:10px 12px"><div class="bc-lbl">A Pagar</div><div class="bc-val" style="font-size:14px">${fmt(totAberto)}</div></div>`:''}
+    ${totVencido>0?`<div class="bill-card vencido" style="flex:1;text-align:left;padding:10px 12px"><div class="bc-lbl">Vencido</div><div class="bc-val" style="font-size:14px">${fmt(totVencido)}</div></div>`:''}
   </div>`:''}
-  `:''}
   <div class="sec-title">Histórico 5 Meses</div>
   <div class="chart-card">
     <div class="chart-leg">
@@ -730,13 +791,13 @@ function renderDashboard(txs,income,expense,expByCat,hist,maxBar){
     <div class="chart-xl">${hist.map(h=>`<span class="${h.active?'cur':''}">${h.label}</span>`).join('')}</div>
   </div>
   ${expByCat.length?`
-  <div class="sec-title">Despesas por Categoria</div>
+  <div class="sec-title">Por Categoria</div>
   <div class="cat-list">
     ${expByCat.map(c=>`
     <div class="cat-row">
       <div class="cat-ico">${c.icon}</div>
       <div class="cat-info">
-        <div class="cat-name">${c.label}</div>
+        <div class="cat-name">${esc(c.label)}</div>
         <div class="cat-pb"><div class="cat-pf" style="width:${expense>0?(c.total/expense*100).toFixed(1):0}%"></div></div>
       </div>
       <div class="cat-val">${fmt(c.total)}</div>
@@ -745,43 +806,39 @@ function renderDashboard(txs,income,expense,expByCat,hist,maxBar){
   `;
 }
 
-// ── TRANSACTIONS ──
+// ── Transactions ──
 function renderTransactions(txs){
   if(!txs.length) return `<div class="empty"><div class="empty-ico">🌿</div><h3>Nenhuma transação</h3><p>Toque em <strong style="color:var(--acc)">+</strong> para adicionar.</p></div>`;
-
-  const STATUS_LABEL={aberto:'Em aberto',pago:'Pago',vencido:'Vencido'};
-  const STATUS_ICO={aberto:'🕐',pago:'✅',vencido:'⚠️'};
-
   return `
   <div class="sec-title">${txs.length} transaç${txs.length===1?'ão':'ões'}</div>
   ${txs.map(tx=>{
-    const cat=catInfo(tx.category,tx.type);
-    const d=new Date(tx.date);
-    const st=tx.type==='expense'?(tx.status||'aberto'):'pago';
-    const payInfo=tx.type==='expense'&&tx.paymentDate?` · Pago em ${new Date(tx.paymentDate).toLocaleDateString('pt-BR')}`:'';
+    const cat = catInfo(tx.category, tx.type);
+    const d   = new Date(tx.date+'T12:00:00');
+    const st  = tx.type==='expense' ? tx.status : 'pago';
+    const stLabel = {aberto:'Em aberto',pago:'Pago',vencido:'Vencido'}[st]||st;
     return `<div class="tx-item ${st==='vencido'?'vencido':''}" data-edit="${tx.id}">
       <div class="tx-ico ${tx.type}">${cat.icon}</div>
       <div class="tx-info">
         <div class="tx-desc">${esc(tx.description)}</div>
-        <div class="tx-meta">${cat.label} · Venc. ${d.toLocaleDateString('pt-BR')}${payInfo}</div>
-        ${tx.type==='expense'?`<div style="margin-top:5px"><span class="status-badge ${st}">${STATUS_ICO[st]} ${STATUS_LABEL[st]}</span></div>`:''}
+        <div class="tx-meta">${esc(cat.label)} · ${d.toLocaleDateString('pt-BR')}</div>
       </div>
       <div class="tx-right">
         <div class="tx-amt ${tx.type}">${tx.type==='income'?'+':'−'}${fmt(tx.amount)}</div>
+        ${tx.type==='expense'?`<span class="status-badge ${st}">${stLabel}</span>`:''}
         <button class="icon-btn" data-del="${tx.id}">🗑</button>
       </div>
     </div>`;
   }).join('')}`;
 }
 
-// ── CATEGORIES MANAGER ──
+// ── Categories Manager ──
 function renderCategories(){
-  const cats=S.userData?.categories[S.catFilter]||[];
+  const cats = S.userData?.categories[S.catFilter] || [];
   return `
   <div class="sec-title">Gerenciar categorias</div>
   <div class="cat-type-toggle">
     <button class="cat-type-btn exp ${S.catFilter==='expense'?'sel':''}" data-catfilter="expense">💸 Despesas</button>
-    <button class="cat-type-btn inc ${S.catFilter==='income'?'sel':''}" data-catfilter="income">💰 Receitas</button>
+    <button class="cat-type-btn inc ${S.catFilter==='income'?'sel':''}"  data-catfilter="income">💰 Receitas</button>
   </div>
   <div class="cat-manage-list">
     ${cats.map(c=>`
@@ -790,17 +847,17 @@ function renderCategories(){
       <div class="cm-name">${esc(c.label)}</div>
       <div class="cm-actions">
         <button class="cm-btn edit" data-editcat="${c.id}" data-cattype="${S.catFilter}">✏️</button>
-        <button class="cm-btn del" data-delcat="${c.id}" data-cattype="${S.catFilter}">🗑</button>
+        <button class="cm-btn del"  data-delcat="${c.id}"  data-cattype="${S.catFilter}">🗑</button>
       </div>
     </div>`).join('')}
     <button class="add-cat-btn" id="addCatBtn">＋ Nova categoria</button>
   </div>`;
 }
 
-// ── PROFILE ──
+// ── Profile ──
 function renderProfile(txs, income, expense){
-  const u=S.currentUser;
-  const allTxs=S.userData?.transactions||[];
+  const u = S.currentUser;
+  const allTxs = S.userData?.transactions || [];
   return `
   <div class="sec-title">Minha conta</div>
   <div class="profile-card">
@@ -808,14 +865,8 @@ function renderProfile(txs, income, expense){
     <div class="prof-name">${esc(u?.name)}</div>
     <div class="prof-email">${esc(u?.email)}</div>
     <div class="prof-stat-row">
-      <div class="prof-stat">
-        <div class="ps-val">${allTxs.length}</div>
-        <div class="ps-lbl">Transações</div>
-      </div>
-      <div class="prof-stat">
-        <div class="ps-val">${(S.userData?.categories?.income?.length||0)+(S.userData?.categories?.expense?.length||0)}</div>
-        <div class="ps-lbl">Categorias</div>
-      </div>
+      <div class="prof-stat"><div class="ps-val">${allTxs.length}</div><div class="ps-lbl">Transações</div></div>
+      <div class="prof-stat"><div class="ps-val">${(S.userData?.categories?.income?.length||0)+(S.userData?.categories?.expense?.length||0)}</div><div class="ps-lbl">Categorias</div></div>
     </div>
   </div>
   <div class="sec-title">Este mês</div>
@@ -827,18 +878,18 @@ function renderProfile(txs, income, expense){
   </div>
   <div class="sec-title">Conta</div>
   <div class="profile-card">
+    <div class="info-note" style="margin-bottom:14px">☁️ Dados salvos no <strong>Supabase</strong> — acessível em qualquer dispositivo.</div>
     <button class="btn-primary" id="editProfileBtn" style="margin-bottom:10px">✏️ Editar perfil</button>
     <button class="danger-btn" id="logoutBtn">Sair da conta</button>
   </div>`;
 }
 
-// ── TX MODAL ──
+// ── TX Modal ──
 function renderTxModal(){
-  const f=S.txForm;
-  const cats=f.type==='income'?(S.userData?.categories?.income||[]):(S.userData?.categories?.expense||[]);
-  // ensure selected category exists
-  const catExists=cats.find(c=>c.id===f.category);
-  if(!catExists&&cats.length>0) S.txForm.category=cats[0].id;
+  const f = S.txForm;
+  const cats = f.type==='income' ? (S.userData?.categories?.income||[]) : (S.userData?.categories?.expense||[]);
+  if(!cats.find(c=>c.id===f.category) && cats.length>0) S.txForm.category = cats[0].id;
+  const showPayDate = f.type==='expense' && f.status==='pago';
   return `
   <div class="overlay" id="txOverlay">
     <div class="sheet">
@@ -846,41 +897,42 @@ function renderTxModal(){
       <div class="sheet-title">${S.editTxId?'Editar':'Nova'} Transação</div>
       <div class="type-toggle">
         <button class="type-btn expense ${f.type==='expense'?'sel':''}" data-ttype="expense">💸 Despesa</button>
-        <button class="type-btn income ${f.type==='income'?'sel':''}" data-ttype="income">💰 Receita</button>
+        <button class="type-btn income  ${f.type==='income' ?'sel':''}" data-ttype="income">💰 Receita</button>
       </div>
       <div class="field"><label>Descrição</label><input id="f-desc" type="text" placeholder="Ex: Supermercado" autocomplete="off" value="${esc(f.description)}"/></div>
-      <div class="field"><label>Valor (R$)</label><input id="f-amount" type="number" inputmode="decimal" placeholder="0,00" min="0" step="0.01" value="${f.amount}"/></div>
-      <div class="field"><label>Data de vencimento</label><input id="f-date" type="date" value="${f.date}"/></div>
+      <div class="field"><label>Valor (R$)</label><input id="f-amount" type="number" inputmode="decimal" placeholder="0,00" min="0" step="0.01" value="${esc(String(f.amount))}"/></div>
+      <div class="field"><label>Vencimento</label><input id="f-date" type="date" value="${f.date}"/></div>
       ${f.type==='expense'?`
       <div class="field">
         <label>Status</label>
         <div class="status-toggle">
-          <button class="st-btn aberto ${(f.status||'aberto')==='aberto'?'sel':''}" data-fstatus="aberto"><span class="st-ico">🕐</span>Em aberto</button>
-          <button class="st-btn pago ${f.status==='pago'?'sel':''}" data-fstatus="pago"><span class="st-ico">✅</span>Pago</button>
-          <button class="st-btn vencido ${f.status==='vencido'?'sel':''}" data-fstatus="vencido"><span class="st-ico">⚠️</span>Vencido</button>
+          <button class="st-btn aberto ${f.status==='aberto'?'sel':''}" data-fstatus="aberto">🕐 Em aberto</button>
+          <button class="st-btn pago   ${f.status==='pago'  ?'sel':''}" data-fstatus="pago">✅ Pago</button>
+          <button class="st-btn vencido ${f.status==='vencido'?'sel':''}" data-fstatus="vencido">⚠️ Vencido</button>
         </div>
       </div>
-      ${f.status==='pago'?`<div class="field"><label>Data de pagamento</label><input id="f-paydate" type="date" value="${f.paymentDate||f.date}"/></div>`:''}
-      `:''}
+      ${showPayDate?`<div class="field"><label>Data de pagamento</label><input id="f-paydate" type="date" value="${f.paymentDate||today()}"/></div>`:''}`:''}
       <div class="field">
         <label>Categoria</label>
         <div class="cat-grid">
           ${cats.map(c=>`<button class="cat-opt ${f.category===c.id?'sel':''}" data-tcat="${c.id}">
-            <span class="co-ico">${c.icon}</span><span class="co-lbl">${c.label}</span>
+            <span class="co-ico">${c.icon}</span><span class="co-lbl">${esc(c.label)}</span>
           </button>`).join('')}
         </div>
       </div>
       <div class="sheet-actions">
         <button class="btn-cancel" id="cancelTx">Cancelar</button>
-        <button class="btn-save" id="saveTxBtn">${S.editTxId?'Salvar':'Adicionar'}</button>
+        <button class="btn-save" id="saveTxBtn" ${S.saving?'disabled':''}>
+          ${S.saving?'Salvando...':(S.editTxId?'Salvar':'Adicionar')}
+        </button>
       </div>
     </div>
   </div>`;
 }
 
-// ── CAT MODAL ──
+// ── Cat Modal ──
 function renderCatModal(){
-  const f=S.catForm;
+  const f = S.catForm;
   return `
   <div class="overlay" id="catOverlay">
     <div class="sheet">
@@ -888,9 +940,9 @@ function renderCatModal(){
       <div class="sheet-title">${S.editCatId?'Editar':'Nova'} Categoria</div>
       <div class="type-toggle">
         <button class="type-btn expense ${f.type==='expense'?'sel':''}" data-ctype="expense">💸 Despesa</button>
-        <button class="type-btn income ${f.type==='income'?'sel':''}" data-ctype="income">💰 Receita</button>
+        <button class="type-btn income  ${f.type==='income' ?'sel':''}" data-ctype="income">💰 Receita</button>
       </div>
-      <div class="field"><label>Nome da categoria</label><input id="cat-label" type="text" placeholder="Ex: Academia" autocomplete="off" value="${esc(f.label)}"/></div>
+      <div class="field"><label>Nome</label><input id="cat-label" type="text" placeholder="Ex: Academia" autocomplete="off" value="${esc(f.label)}"/></div>
       <div class="field">
         <label>Ícone selecionado: <span id="selEmojiPreview">${f.icon}</span></label>
         <div class="emoji-grid">
@@ -899,89 +951,86 @@ function renderCatModal(){
       </div>
       <div class="sheet-actions">
         <button class="btn-cancel" id="cancelCat">Cancelar</button>
-        <button class="btn-save" id="saveCatBtn">${S.editCatId?'Salvar':'Criar'}</button>
+        <button class="btn-save" id="saveCatBtn" ${S.saving?'disabled':''}>
+          ${S.saving?'Salvando...':(S.editCatId?'Salvar':'Criar')}
+        </button>
       </div>
     </div>
   </div>`;
 }
 
-// ── PROFILE MODAL ──
+// ── Profile Modal ──
 function renderProfileModal(){
-  const u=S.currentUser;
+  const u = S.currentUser;
   return `
   <div class="overlay" id="profOverlay">
     <div class="sheet">
       <div class="sheet-handle"></div>
       <div class="sheet-title">Editar Perfil</div>
-      <div class="field"><label>Nome completo</label><input id="p-name" type="text" autocomplete="name" value="${esc(u?.name)}"/></div>
-      <div class="field"><label>E-mail</label><input id="p-email" type="email" inputmode="email" autocomplete="email" value="${esc(u?.email)}"/></div>
+      <div class="field"><label>Nome completo</label><input id="p-name"  type="text"     autocomplete="name"  value="${esc(u?.name)}"/></div>
+      <div class="field"><label>E-mail</label>       <input id="p-email" type="email"    autocomplete="email" value="${esc(u?.email)}"/></div>
       <div class="field"><label>Nova senha <span style="color:var(--muted);font-size:9px">(deixe em branco para não alterar)</span></label><input id="p-pass" type="password" placeholder="••••••••"/></div>
       <div class="sheet-actions">
         <button class="btn-cancel" id="cancelProf">Cancelar</button>
-        <button class="btn-save" id="saveProf">Salvar</button>
+        <button class="btn-save"   id="saveProf"   ${S.saving?'disabled':''}>${S.saving?'Salvando...':'Salvar'}</button>
       </div>
     </div>
   </div>`;
 }
 
-// ── CONFIRM ──
+// ── Confirm ──
 function renderConfirm(){
-  const cd=S.confirmDelete;
+  const cd = S.confirmDelete;
   return `
   <div class="overlay" id="confirmOv">
     <div class="confirm-box">
       <h3>Confirmar exclusão</h3>
       <p>${cd.type==='cat'?'Transações dessa categoria serão reclassificadas automaticamente.':'Esta ação não pode ser desfeita.'}</p>
       <div class="confirm-btns">
-        <button class="btn-keep" id="keepBtn">Cancelar</button>
-        <button class="btn-remove" id="removeBtn">Excluir</button>
+        <button class="btn-keep"   id="keepBtn">Cancelar</button>
+        <button class="btn-remove" id="removeBtn" ${S.saving?'disabled':''}>Excluir</button>
       </div>
     </div>
   </div>`;
 }
 
-// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 //  MAIN RENDER
-// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 function render(){
-  const app=document.getElementById('app');
-  if(S.screen==='login'||S.screen==='register'){
-    app.innerHTML=renderAuth();
+  const app = document.getElementById('app');
+  if(S.loading){
+    app.innerHTML = `<div class="loading-screen"><div class="spinner"></div><p>Carregando...</p></div>`;
+    return;
+  }
+  if(S.screen==='login' || S.screen==='register'){
+    app.innerHTML = renderAuth();
   } else {
-    app.innerHTML=renderApp();
+    app.innerHTML = renderApp();
   }
   bind();
 }
 
-// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 //  BIND EVENTS
-// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
 function bind(){
-  // ── AUTH ──
-  if(S.screen==='login'||S.screen==='register'){
-    on('#a-name','input',e=>{S.authForm.name=e.target.value});
-    on('#a-email','input',e=>{S.authForm.email=e.target.value});
-    on('#a-pass','input',e=>{S.authForm.password=e.target.value});
-    on('#a-conf','input',e=>{S.authForm.confirm=e.target.value});
-    on('#authSubmit','click',()=>{ S.screen==='login'?tryLogin():tryRegister(); });
-    on('#authSwitch','click',()=>{
-      S.screen=S.screen==='login'?'register':'login';
-      S.authErr='';
-      render();
-    });
-    // Enter key
-    document.addEventListener('keydown',e=>{ if(e.key==='Enter') q('#authSubmit')?.click(); },{once:true});
+  if(S.screen==='login' || S.screen==='register'){
+    on('#authSubmit','click', ()=>{ S.screen==='login' ? tryLogin() : tryRegister(); });
+    on('#authSwitch','click', ()=>{ S.screen = S.screen==='login'?'register':'login'; S.authErr=''; render(); });
+    document.addEventListener('keydown', e=>{ if(e.key==='Enter') q('#authSubmit')?.click(); }, {once:true});
     return;
   }
 
-  // ── APP ──
-  // Header
+  // Header / nav
   on('#prevM','click',()=>{ S.month=S.month===1?12:S.month-1; render(); });
   on('#nextM','click',()=>{ S.month=S.month===12?1:S.month+1; render(); });
   on('#profileBtn','click',()=>{ S.tab='profile'; render(); });
-
-  // Tabs (both header and nav)
   onAll('[data-tab]','click',el=>{ S.tab=el.dataset.tab; render(); });
+
+  // PWA install
+  on('#installBtn','click',()=>{ if(S.deferredPrompt){S.deferredPrompt.prompt();S.showInstall=false;render();} });
+  on('#closeBanner','click',()=>{ S.showInstall=false; render(); });
 
   // FAB
   on('#fabBtn','click',()=>{
@@ -991,148 +1040,135 @@ function bind(){
       S.modal='cat';
     } else {
       S.editTxId=null;
-      const defCat=(S.userData?.categories?.expense||[])[0]?.id||'other_ex';
+      const defCat=(S.userData?.categories?.expense||[])[0]?.id||'';
       S.txForm={type:'expense',category:defCat,description:'',amount:'',date:today(),status:'aberto',paymentDate:''};
       S.modal='tx';
     }
     render();
   });
 
-  // Install
-  on('#installBtn','click',()=>{ if(S.deferredPrompt){S.deferredPrompt.prompt();S.showInstall=false;render();} });
-  on('#closeBanner','click',()=>{ S.showInstall=false; render(); });
-
-  // Category filter toggle
+  // Category filter
   onAll('[data-catfilter]','click',el=>{ S.catFilter=el.dataset.catfilter; render(); });
 
-  // Edit category button
+  // Edit / delete category
   onAll('[data-editcat]','click',el=>{
     const id=el.dataset.editcat, type=el.dataset.cattype;
     const cat=(S.userData?.categories[type]||[]).find(c=>c.id===id);
     if(!cat) return;
-    S.editCatId=id;
-    S.catForm={type,label:cat.label,icon:cat.icon};
-    S.modal='cat';
-    render();
+    S.editCatId=id; S.catForm={type,label:cat.label,icon:cat.icon}; S.modal='cat'; render();
   });
-
-  // Delete category button
   onAll('[data-delcat]','click',el=>{
-    S.confirmDelete={type:'cat',id:el.dataset.delcat,catType:el.dataset.cattype};
-    render();
+    S.confirmDelete={type:'cat',id:el.dataset.delcat,catType:el.dataset.cattype}; render();
   });
-
-  // Add cat button
   on('#addCatBtn','click',()=>{
-    S.editCatId=null;
-    S.catForm={type:S.catFilter,label:'',icon:'🏠'};
-    S.modal='cat';
-    render();
+    S.editCatId=null; S.catForm={type:S.catFilter,label:'',icon:'🏠'}; S.modal='cat'; render();
   });
 
-  // Edit tx
+  // Edit / delete transaction
   onAll('[data-edit]','click',el=>{
-    const tx=S.userData.transactions.find(t=>t.id===+el.dataset.edit);
+    const tx=S.userData.transactions.find(t=>t.id===el.dataset.edit);
     if(!tx) return;
     S.editTxId=tx.id;
     S.txForm={type:tx.type,category:tx.category,description:tx.description,amount:String(tx.amount),date:tx.date,status:tx.status||'aberto',paymentDate:tx.paymentDate||''};
-    S.modal='tx';
-    render();
+    S.modal='tx'; render();
   });
+  onAll('[data-del]','click',(el,e)=>{ e.stopPropagation(); S.confirmDelete={type:'tx',id:el.dataset.del}; render(); });
 
-  // Del tx
-  onAll('[data-del]','click',(el,e)=>{
-    e.stopPropagation();
-    S.confirmDelete={type:'tx',id:+el.dataset.del};
-    render();
-  });
-
-  // Profile buttons
+  // Profile
   on('#editProfileBtn','click',()=>{ S.modal='profile'; render(); });
-  on('#logoutBtn','click',()=>{ logout(); });
+  on('#logoutBtn','click',doLogout);
 
-  // ── TX MODAL ──
+  // TX modal
   on('#txOverlay','click',e=>{ if(e.target.id==='txOverlay'){S.modal=null;render();} });
   on('#cancelTx','click',()=>{ S.modal=null; render(); });
-  on('#saveTxBtn','click',saveTx);
+  on('#saveTxBtn','click',saveTxData);
   onAll('[data-ttype]','click',el=>{
     const t=el.dataset.ttype;
     S.txForm.type=t;
-    const cats=S.userData?.categories[t]||[];
-    S.txForm.category=cats[0]?.id||'';
-    if(t==='income'){S.txForm.status='pago';S.txForm.paymentDate='';}
-    render();
+    S.txForm.category=(S.userData?.categories[t]||[])[0]?.id||'';
+    S.txForm.status='aberto'; render();
   });
   onAll('[data-tcat]','click',el=>{ S.txForm.category=el.dataset.tcat; render(); });
-  onAll('[data-fstatus]','click',el=>{
-    S.txForm.status=el.dataset.fstatus;
-    if(el.dataset.fstatus==='pago'&&!S.txForm.paymentDate) S.txForm.paymentDate=today();
-    render();
-  });
+  onAll('[data-fstatus]','click',el=>{ S.txForm.status=el.dataset.fstatus; render(); });
 
-  // ── CAT MODAL ──
+  // Cat modal
   on('#catOverlay','click',e=>{ if(e.target.id==='catOverlay'){S.modal=null;render();} });
   on('#cancelCat','click',()=>{ S.modal=null; render(); });
-  on('#saveCatBtn','click',saveCat);
+  on('#saveCatBtn','click',saveCatData);
   onAll('[data-ctype]','click',el=>{ S.catForm.type=el.dataset.ctype; render(); });
+  on('#cat-label','input',e=>{ S.catForm.label=e.target.value; });
   onAll('[data-emo]','click',el=>{
     S.catForm.icon=el.dataset.emo;
-    // update preview without full render
     const prev=q('#selEmojiPreview');
     if(prev) prev.textContent=el.dataset.emo;
     qa('[data-emo]').forEach(b=>b.classList.toggle('sel',b.dataset.emo===el.dataset.emo));
   });
-  on('#cat-label','input',e=>{ S.catForm.label=e.target.value; });
 
-  // ── PROFILE MODAL ──
+  // Profile modal
   on('#profOverlay','click',e=>{ if(e.target.id==='profOverlay'){S.modal=null;render();} });
   on('#cancelProf','click',()=>{ S.modal=null; render(); });
-  on('#saveProf','click',()=>{
-    const name=q('#p-name')?.value.trim();
-    const email=q('#p-email')?.value.trim().toLowerCase();
-    const pass=q('#p-pass')?.value;
-    if(!name||!email){showToast('Nome e e-mail são obrigatórios.','#f0637a');return;}
-    // check email taken by another user
-    const users=getUsers();
-    if(users.find(u=>u.email===email&&u.id!==S.currentUser.id)){showToast('E-mail já usado por outro usuário.','#f0637a');return;}
-    const updated={...S.currentUser,name,email};
-    if(pass) updated.password=pass;
-    const newUsers=users.map(u=>u.id===updated.id?updated:u);
-    saveUsers(newUsers);
-    S.currentUser=updated;
-    S.modal=null;
-    showToast('Perfil atualizado! ✅','#26d4a0');
-  });
+  on('#saveProf','click',saveProfileData);
 
-  // ── CONFIRM ──
+  // Confirm modal
   on('#confirmOv','click',e=>{ if(e.target.id==='confirmOv'){S.confirmDelete=null;render();} });
   on('#keepBtn','click',()=>{ S.confirmDelete=null; render(); });
   on('#removeBtn','click',()=>{
     const cd=S.confirmDelete;
-    if(cd.type==='tx') deleteTx(cd.id);
-    else if(cd.type==='cat') deleteCat(cd.id,cd.catType);
+    if(cd.type==='tx') deleteTxById(cd.id);
+    else deleteCatById(cd.id, cd.catType);
   });
 }
 
-// ══════════════════════════════════════════════
-//  BOOT
-// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+//  PWA INSTALL
+// ══════════════════════════════════════════════════════════════════
 window.addEventListener('beforeinstallprompt',e=>{
   e.preventDefault(); S.deferredPrompt=e; S.showInstall=true; render();
 });
 
+// ══════════════════════════════════════════════════════════════════
+//  SERVICE WORKER
+// ══════════════════════════════════════════════════════════════════
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}); });
 }
 
-// Auto-login from session
-const sid=getSession();
-if(sid){
-  const user=getUsers().find(u=>u.id===sid);
-  if(user){ S.currentUser=user; S.userData=getUserData(user.id); S.screen='app'; }
+// ══════════════════════════════════════════════════════════════════
+//  INIT — check Supabase session on load
+// ══════════════════════════════════════════════════════════════════
+async function init(){
+  // Listen for auth state changes (token refresh, sign-out from other tab, etc.)
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if(event==='SIGNED_OUT' && S.screen==='app'){
+      S.currentUser=null; S.userData=null;
+      S.screen='login'; S.loading=false; render();
+    }
+    if((event==='TOKEN_REFRESHED'||event==='SIGNED_IN') && session && S.screen!=='app'){
+      S.currentUser = { id:session.user.id, name:session.user.user_metadata?.name||'', email:session.user.email };
+      await loadUserData(session.user.id);
+      S.screen='app'; S.loading=false; render();
+    }
+  });
+
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if(session){
+      S.currentUser = { id:session.user.id, name:session.user.user_metadata?.name||'', email:session.user.email };
+      await loadUserData(session.user.id);
+      S.screen='app';
+    } else {
+      S.screen='login';
+    }
+  } catch(err) {
+    console.error('Init error:', err);
+    S.screen='login';
+  }
+
+  S.loading=false;
+  render();
 }
 
-render();
+init();
 </script>
 </body>
 </html>
