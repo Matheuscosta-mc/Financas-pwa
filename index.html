@@ -37,7 +37,7 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'DM Sans
 .loading-screen p{font-size:13px;color:var(--muted)}
 
 /* ══ AUTH ══ */
-.auth-page{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg);overflow-y:auto;overflow-x:hidden}
+.auth-page{flex:1;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg);overflow-y:auto;overflow-x:hidden}
 .auth-page::-webkit-scrollbar{display:none}
 .auth-inner{width:100%;max-width:420px}
 .auth-brand{text-align:center;margin-bottom:32px}
@@ -1160,25 +1160,51 @@ if('serviceWorker' in navigator){
 
 // ══ INIT ══
 async function init(){
-  sb.auth.onAuthStateChange(async(event,session)=>{
-    if(event==='SIGNED_OUT'&&S.screen==='app'){
-      S.currentUser=null;S.userData=null;S.screen='login';S.loading=false;render();
+  // Timeout fallback: if Supabase hangs for 10s, show login screen
+  const loadingTimeout = setTimeout(()=>{
+    if(S.loading){ S.loading=false; S.screen='login'; render(); }
+  }, 10000);
+
+  // Flag to prevent double data-loading from race between
+  // INITIAL_SESSION event and our getSession() call below
+  let sessionHandled = false;
+
+  sb.auth.onAuthStateChange(async(event, session)=>{
+    // INITIAL_SESSION fires when the app opens with a stored session
+    // SIGNED_IN fires on fresh login
+    // TOKEN_REFRESHED fires when Supabase auto-refreshes the JWT
+    if((event==='INITIAL_SESSION'||event==='SIGNED_IN'||event==='TOKEN_REFRESHED') && session){
+      if(sessionHandled && S.screen==='app') return; // already loaded, ignore refresh
+      sessionHandled = true;
+      clearTimeout(loadingTimeout);
+      try {
+        S.currentUser={id:session.user.id,name:session.user.user_metadata?.name||'',email:session.user.email};
+        await loadUserData(session.user.id);
+        S.screen='app';
+      } catch(err){
+        console.error('loadUserData error:', err);
+        S.screen='login';
+      }
+      S.loading=false; render();
+      return;
     }
-    if((event==='TOKEN_REFRESHED'||event==='SIGNED_IN')&&session&&S.screen!=='app'){
-      S.currentUser={id:session.user.id,name:session.user.user_metadata?.name||'',email:session.user.email};
-      await loadUserData(session.user.id);
-      S.screen='app';S.loading=false;render();
+
+    // INITIAL_SESSION with no session = not logged in
+    if(event==='INITIAL_SESSION' && !session){
+      sessionHandled = true;
+      clearTimeout(loadingTimeout);
+      S.screen='login'; S.loading=false; render();
+      return;
+    }
+
+    // User signed out (from this tab or another tab)
+    if(event==='SIGNED_OUT'){
+      sessionHandled = false;
+      S.currentUser=null; S.userData=null;
+      S.screen='login'; S.loading=false; render();
+      return;
     }
   });
-  try {
-    const{data:{session}}=await sb.auth.getSession();
-    if(session){
-      S.currentUser={id:session.user.id,name:session.user.user_metadata?.name||'',email:session.user.email};
-      await loadUserData(session.user.id);
-      S.screen='app';
-    } else { S.screen='login'; }
-  } catch(err){ console.error(err);S.screen='login'; }
-  S.loading=false;render();
 }
 init();
 </script>
