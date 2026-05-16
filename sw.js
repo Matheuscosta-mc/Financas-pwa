@@ -1,15 +1,19 @@
-const CACHE = 'financas-sb-v4';
-const ASSETS = ['./index.html', './manifest.json'];
+const CACHE = 'financas-v5';
+const ASSETS = ['./index.html','./manifest.json'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
   self.skipWaiting();
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))));
+  e.waitUntil(caches.keys().then(ks =>
+    Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))
+  ));
   self.clients.claim();
 });
 self.addEventListener('fetch', e => {
-  // Don't cache Supabase API calls
-  if (e.request.url.includes('supabase.co')) return;
+  if (e.request.url.includes('supabase.co') ||
+      e.request.url.includes('fonts.googleapis') ||
+      e.request.url.includes('fonts.gstatic') ||
+      e.request.url.includes('cdn.jsdelivr')) return;
   e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
 });

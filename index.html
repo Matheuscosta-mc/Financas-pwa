@@ -447,7 +447,22 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'DM Sans
 // ══════════════════════════════════════════════════════════════════
 const SUPABASE_URL = 'https://ojegwnbpmzpmvfcrmvvj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9qZWd3bmJwbXpwbXZmY3JtdnZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1Njg2MDUsImV4cCI6MjA5NDE0NDYwNX0.7GPpuwcPVdNgXL-91TDWcrT65LuyNweE7RXj8U8bDYI';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Show loading screen immediately — before anything async happens
+document.getElementById('app').innerHTML =
+  '<div class="loading-screen"><div class="spinner"></div><p>Carregando...</p></div>';
+
+// Guard against Supabase CDN failure (offline / blocked CDN)
+let sb;
+try {
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch(e) {
+  document.getElementById('app').innerHTML =
+    '<div class="loading-screen"><div class="spinner" style="border-top-color:#f0637a"></div>'
+    + '<p style="color:#f0637a;text-align:center;max-width:280px">'
+    + 'Não foi possível conectar.<br>Verifique sua conexão e recarregue a página.</p></div>';
+  throw e; // stop execution
+}
 
 // ══ CONSTANTS ══
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -885,7 +900,6 @@ function renderTransactions(allTxs){
   const f = S.txFilter;
   const hasFilter = !!(f.type || f.status || f.category);
 
-  // Build category chips based on selected type (or both)
   const incCats = S.userData?.categories?.income  || [];
   const expCats = S.userData?.categories?.expense || [];
   const catChips = f.type==='income'  ? incCats
@@ -898,10 +912,55 @@ function renderTransactions(allTxs){
   if(f.status)   txs = txs.filter(t => (t.type==='expense' ? t.status : 'pago') === f.status);
   if(f.category) txs = txs.filter(t => t.category === f.category);
 
-  // Totals from filtered set
+  // Totals
   const totIncome  = txs.filter(t=>t.type==='income') .reduce((s,t)=>s+t.amount,0);
   const totExpense = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
   const totBalance = totIncome - totExpense;
+
+  // ── Build tx rows with string concatenation (avoids triple-nested template literals) ──
+  const txRowsHtml = txs.map(tx => {
+    const cat    = catInfo(tx.category, tx.type);
+    const d      = new Date(tx.date + 'T12:00:00');
+    const st     = tx.type==='expense' ? tx.status : 'pago';
+    const stLbl  = {aberto:'Em aberto', pago:'Pago', vencido:'Vencido'}[st] || st;
+    const badge  = tx.type==='expense'
+      ? '<span class="status-badge ' + st + '">' + stLbl + '</span>'
+      : '';
+    const sign   = tx.type==='income' ? '+' : '−';
+    return '<div class="tx-item ' + (st==='vencido' ? 'vencido' : '') + '" data-edit="' + tx.id + '">'
+      + '<div class="tx-ico ' + tx.type + '">' + cat.icon + '</div>'
+      + '<div class="tx-info">'
+      +   '<div class="tx-desc">'  + esc(tx.description) + '</div>'
+      +   '<div class="tx-meta">'  + esc(cat.label) + ' · ' + d.toLocaleDateString('pt-BR') + '</div>'
+      + '</div>'
+      + '<div class="tx-right">'
+      +   '<div class="tx-amt ' + tx.type + '">' + sign + fmt(tx.amount) + '</div>'
+      +   badge
+      +   '<button class="icon-btn" data-del="' + tx.id + '">🗑</button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  // ── Category chips html ──
+  const catChipsHtml = catChips.map(c =>
+    '<button class="f-chip ' + (f.category===c.id ? 'sel-cat' : '') + '" data-fcat="' + c.id + '">'
+    + c.icon + ' ' + esc(c.label) + '</button>'
+  ).join('');
+
+  const catGroupHtml = catChips.length
+    ? '<div class="filter-group"><label>Categoria</label><div class="filter-chips">' + catChipsHtml + '</div></div>'
+    : '';
+
+  // ── Empty state ──
+  const emptyHtml = !txs.length
+    ? '<div class="empty">'
+      + '<div class="empty-ico">' + (hasFilter ? '🔍' : '🌿') + '</div>'
+      + '<h3>' + (hasFilter ? 'Nenhum resultado' : 'Nenhuma transação') + '</h3>'
+      + '<p>' + (hasFilter
+          ? 'Tente ajustar ou <strong style="color:var(--acc);cursor:pointer" id="clearFilterBtn2">limpar os filtros</strong>.'
+          : 'Use o botão <strong style="color:var(--acc)">+ Adicionar</strong> para começar.')
+      + '</p></div>'
+    : '<p class="sec-title">' + txs.length + ' transaç' + (txs.length===1?'ão':'ões') + (hasFilter?' (filtrado)':'') + '</p>' + txRowsHtml;
 
   return `
   <!-- FILTER PANEL -->
@@ -916,29 +975,23 @@ function renderTransactions(allTxs){
       <div class="filter-group">
         <label>Tipo</label>
         <div class="filter-chips">
-          <button class="f-chip ${f.type==='income'?'sel-type-income':''}"  data-ftype="income">💰 Receitas</button>
-          <button class="f-chip ${f.type==='expense'?'sel-type-expense':''}" data-ftype="expense">💸 Despesas</button>
+          <button class="f-chip ${f.type==='income'  ? 'sel-type-income'  : ''}" data-ftype="income">💰 Receitas</button>
+          <button class="f-chip ${f.type==='expense' ? 'sel-type-expense' : ''}" data-ftype="expense">💸 Despesas</button>
         </div>
       </div>
       <div class="filter-group">
         <label>Situação</label>
         <div class="filter-chips">
-          <button class="f-chip ${f.status==='aberto' ?'sel-status-aberto' :''}" data-fstatus2="aberto">🕐 Em aberto</button>
-          <button class="f-chip ${f.status==='pago'   ?'sel-status-pago'   :''}" data-fstatus2="pago">✅ Pago</button>
-          <button class="f-chip ${f.status==='vencido'?'sel-status-vencido':''}" data-fstatus2="vencido">⚠️ Vencido</button>
+          <button class="f-chip ${f.status==='aberto'  ? 'sel-status-aberto'  : ''}" data-fstatus2="aberto">🕐 Em aberto</button>
+          <button class="f-chip ${f.status==='pago'    ? 'sel-status-pago'    : ''}" data-fstatus2="pago">✅ Pago</button>
+          <button class="f-chip ${f.status==='vencido' ? 'sel-status-vencido' : ''}" data-fstatus2="vencido">⚠️ Vencido</button>
         </div>
       </div>
-      ${catChips.length ? `
-      <div class="filter-group">
-        <label>Categoria</label>
-        <div class="filter-chips">
-          ${catChips.map(c=>`<button class="f-chip ${f.category===c.id?'sel-cat':''}" data-fcat="${c.id}">${c.icon} ${esc(c.label)}</button>`).join('')}
-        </div>
-      </div>` : ''}
+      ${catGroupHtml}
     </div>
   </div>
 
-  <!-- TOTALS CARDS -->
+  <!-- TOTALS -->
   <div class="filter-totals">
     <div class="ft-card income">
       <div class="ft-lbl">Receitas</div>
@@ -958,34 +1011,9 @@ function renderTransactions(allTxs){
   </div>
 
   <!-- LIST -->
-  ${!txs.length ? `
-  <div class="empty">
-    <div class="empty-ico">${hasFilter?'🔍':'🌿'}</div>
-    <h3>${hasFilter?'Nenhum resultado':'Nenhuma transação'}</h3>
-    <p>${hasFilter?'Tente ajustar ou <strong style="color:var(--acc);cursor:pointer" id="clearFilterBtn2">limpar os filtros</strong>.':'Use o botão <strong style="color:var(--acc)">+ Adicionar</strong> para começar.'}</p>
-  </div>` : `
-  <p class="sec-title">${txs.length} transaç${txs.length===1?'ão':'ões'}${hasFilter?' (filtrado)':''}</p>
-  ${txs.map(tx=>{
-    const cat=catInfo(tx.category,tx.type);
-    const d=new Date(tx.date+'T12:00:00');
-    const st=tx.type==='expense'?tx.status:'pago';
-    const stLabel={aberto:'Em aberto',pago:'Pago',vencido:'Vencido'}[st]||st;
-    return \`<div class="tx-item \${st==='vencido'?'vencido':''}" data-edit="\${tx.id}">
-      <div class="tx-ico \${tx.type}">\${cat.icon}</div>
-      <div class="tx-info">
-        <div class="tx-desc">\${esc(tx.description)}</div>
-        <div class="tx-meta">\${esc(cat.label)} · \${d.toLocaleDateString('pt-BR')}</div>
-      </div>
-      <div class="tx-right">
-        <div class="tx-amt \${tx.type}">\${tx.type==='income'?'+':'−'}\${fmt(tx.amount)}</div>
-        \${tx.type==='expense'?\`<span class="status-badge \${st}">\${stLabel}</span>\`:''}
-        <button class="icon-btn" data-del="\${tx.id}">🗑</button>
-      </div>
-    </div>\`;
-  }).join('')}`}
+  ${emptyHtml}
   `;
 }
-
 // ── Categories ──
 function renderCategories(){
   const cats=S.userData?.categories[S.catFilter]||[];
@@ -1294,52 +1322,81 @@ if('serviceWorker' in navigator){
 }
 
 // ══ INIT ══
+async function boot(session){
+  // Common logic to go from a session → loaded app
+  try {
+    S.currentUser = {
+      id:    session.user.id,
+      name:  session.user.user_metadata?.name || '',
+      email: session.user.email
+    };
+    await loadUserData(session.user.id);
+    S.screen = 'app';
+  } catch(err) {
+    console.error('boot error:', err);
+    S.screen = 'login';
+  }
+  S.loading = false;
+  render();
+}
+
 async function init(){
-  // Timeout fallback: if Supabase hangs for 10s, show login screen
+  // ── Timeout fallback: 8s, then show login ──
   const loadingTimeout = setTimeout(()=>{
     if(S.loading){ S.loading=false; S.screen='login'; render(); }
-  }, 10000);
+  }, 8000);
 
-  // Flag to prevent double data-loading from race between
-  // INITIAL_SESSION event and our getSession() call below
-  let sessionHandled = false;
+  // ── Guard against double-loading (race between listener and getSession) ──
+  let booted = false;
+  const bootOnce = async (session) => {
+    if(booted) return;
+    booted = true;
+    clearTimeout(loadingTimeout);
+    if(session) { await boot(session); }
+    else         { S.screen='login'; S.loading=false; render(); }
+  };
 
-  sb.auth.onAuthStateChange(async(event, session)=>{
-    // INITIAL_SESSION fires when the app opens with a stored session
-    // SIGNED_IN fires on fresh login
-    // TOKEN_REFRESHED fires when Supabase auto-refreshes the JWT
-    if((event==='INITIAL_SESSION'||event==='SIGNED_IN'||event==='TOKEN_REFRESHED') && session){
-      if(sessionHandled && S.screen==='app') return; // already loaded, ignore refresh
-      sessionHandled = true;
-      clearTimeout(loadingTimeout);
-      try {
-        S.currentUser={id:session.user.id,name:session.user.user_metadata?.name||'',email:session.user.email};
-        await loadUserData(session.user.id);
-        S.screen='app';
-      } catch(err){
-        console.error('loadUserData error:', err);
-        S.screen='login';
-      }
-      S.loading=false; render();
+  // ── PRIMARY: onAuthStateChange (handles INITIAL_SESSION, TOKEN_REFRESHED, etc.) ──
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if(event === 'INITIAL_SESSION') {
+      // Fires on every page load — with or without a session
+      await bootOnce(session);
       return;
     }
-
-    // INITIAL_SESSION with no session = not logged in
-    if(event==='INITIAL_SESSION' && !session){
-      sessionHandled = true;
-      clearTimeout(loadingTimeout);
-      S.screen='login'; S.loading=false; render();
+    if(event === 'SIGNED_IN') {
+      // Fresh login — bootOnce may already have fired; if app isn't loaded yet, boot now
+      await bootOnce(session);
       return;
     }
-
-    // User signed out (from this tab or another tab)
-    if(event==='SIGNED_OUT'){
-      sessionHandled = false;
-      S.currentUser=null; S.userData=null;
-      S.screen='login'; S.loading=false; render();
+    if(event === 'TOKEN_REFRESHED' && session && S.screen === 'app') {
+      // Silent token refresh while app is running — update user, no full reload
+      S.currentUser = {
+        id:    session.user.id,
+        name:  session.user.user_metadata?.name || S.currentUser?.name || '',
+        email: session.user.email
+      };
       return;
+    }
+    if(event === 'SIGNED_OUT') {
+      booted = false;
+      S.currentUser = null; S.userData = null;
+      S.screen = 'login'; S.loading = false;
+      render();
     }
   });
+
+  // ── FALLBACK: getSession() — in case INITIAL_SESSION doesn't fire (some mobile browsers) ──
+  // We wait 400ms to give onAuthStateChange priority
+  setTimeout(async () => {
+    if(booted) return; // already handled by listener
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      await bootOnce(session);
+    } catch(err) {
+      console.error('getSession fallback error:', err);
+      await bootOnce(null);
+    }
+  }, 400);
 }
 init();
 </script>
