@@ -199,13 +199,23 @@ html,body{height:100%;background:var(--bg);color:var(--txt);font-family:'DM Sans
 .cat-val{font-size:13px;font-weight:700;color:var(--red);flex-shrink:0}
 
 /* ── EXTRATO FILTERS ── */
-.filter-panel{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:16px}
-.filter-panel-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.filter-panel-title span{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.filter-panel{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:0;margin-bottom:16px;overflow:hidden}
+.filter-panel-header{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;cursor:pointer;user-select:none;-webkit-user-select:none;gap:10px}
+.filter-panel-header:active{background:var(--s2)}
+.fp-left{display:flex;align-items:center;gap:8px}
+.fp-left span{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.fp-badge{display:none;padding:2px 7px;border-radius:99px;background:var(--acc-bg);border:1px solid rgba(108,99,255,.3);font-size:10px;font-weight:700;color:var(--acc)}
+.fp-badge.visible{display:inline-block}
+.fp-right{display:flex;align-items:center;gap:8px}
+.fp-toggle{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;border:1px solid var(--border);background:var(--s2);color:var(--txt2);font-size:13px;font-weight:700;transition:transform .25s cubic-bezier(.4,0,.2,1)}
+.fp-toggle.open{transform:rotate(180deg)}
 .clear-filter-btn{display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all .18s}
 .clear-filter-btn:hover{border-color:var(--acc);color:var(--acc)}
 .clear-filter-btn.active{border-color:var(--red);color:var(--red);background:var(--red-bg)}
-.filter-row{display:flex;flex-direction:column;gap:10px}
+.filter-body{padding:0 16px 14px;display:flex;flex-direction:column;gap:12px;overflow:hidden;max-height:0;transition:max-height .35s cubic-bezier(.4,0,.2,1),padding .3s}
+.filter-body.open{max-height:500px;padding:4px 16px 14px}
+.filter-divider{height:1px;background:var(--border);margin:0 0 4px}
+.filter-row{display:flex;flex-direction:column;gap:12px}
 .filter-group label{display:block;font-size:9px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 .filter-chips{display:flex;flex-wrap:wrap;gap:6px}
 .f-chip{padding:6px 12px;border-radius:99px;border:1.5px solid var(--border);background:transparent;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .18s;white-space:nowrap;display:flex;align-items:center;gap:5px}
@@ -495,7 +505,8 @@ let S = {
   currentUser:null, userData:null,
   tab:'dashboard', month:new Date().getMonth()+1, year:new Date().getFullYear(),
   catFilter:'expense',
-  txFilter:{type:'',status:'',category:''},  // extrato filters
+  txFilter:{type:'',status:'',category:''},
+  txFilterOpen: false,  // filter panel collapsed/expanded
   modal:null, editTxId:null, editCatId:null, confirmDelete:null,
   txForm:{type:'expense',category:'',description:'',amount:'',date:today(),status:'aberto',paymentDate:''},
   catForm:{type:'expense',label:'',icon:'🏠'},
@@ -962,32 +973,42 @@ function renderTransactions(allTxs){
       + '</p></div>'
     : '<p class="sec-title">' + txs.length + ' transaç' + (txs.length===1?'ão':'ões') + (hasFilter?' (filtrado)':'') + '</p>' + txRowsHtml;
 
+  const activeCount = [f.type, f.status, f.category].filter(Boolean).length;
+  const badgeHtml   = '<span class="fp-badge' + (activeCount ? ' visible' : '') + '">' + activeCount + ' ativo' + (activeCount!==1?'s':'') + '</span>';
+
   return `
-  <!-- FILTER PANEL -->
+  <!-- FILTER PANEL (collapsible) -->
   <div class="filter-panel">
-    <div class="filter-panel-title">
-      <span>🔍 Filtros</span>
-      <button class="clear-filter-btn ${hasFilter?'active':''}" id="clearFilterBtn">
-        ${hasFilter ? '✕ Limpar filtros' : '— Sem filtros'}
-      </button>
+    <div class="filter-panel-header" id="filterToggleBtn">
+      <div class="fp-left">
+        <span>🔍 Filtros</span>
+        ${badgeHtml}
+      </div>
+      <div class="fp-right">
+        ${hasFilter ? `<button class="clear-filter-btn active" id="clearFilterBtn" style="font-size:11px">✕ Limpar</button>` : ''}
+        <div class="fp-toggle ${S.txFilterOpen ? 'open' : ''}">▾</div>
+      </div>
     </div>
-    <div class="filter-row">
-      <div class="filter-group">
-        <label>Tipo</label>
-        <div class="filter-chips">
-          <button class="f-chip ${f.type==='income'  ? 'sel-type-income'  : ''}" data-ftype="income">💰 Receitas</button>
-          <button class="f-chip ${f.type==='expense' ? 'sel-type-expense' : ''}" data-ftype="expense">💸 Despesas</button>
+    <div class="filter-body ${S.txFilterOpen ? 'open' : ''}">
+      <div class="filter-divider"></div>
+      <div class="filter-row">
+        <div class="filter-group">
+          <label>Tipo</label>
+          <div class="filter-chips">
+            <button class="f-chip ${f.type==='income'  ? 'sel-type-income'  : ''}" data-ftype="income">💰 Receitas</button>
+            <button class="f-chip ${f.type==='expense' ? 'sel-type-expense' : ''}" data-ftype="expense">💸 Despesas</button>
+          </div>
         </div>
-      </div>
-      <div class="filter-group">
-        <label>Situação</label>
-        <div class="filter-chips">
-          <button class="f-chip ${f.status==='aberto'  ? 'sel-status-aberto'  : ''}" data-fstatus2="aberto">🕐 Em aberto</button>
-          <button class="f-chip ${f.status==='pago'    ? 'sel-status-pago'    : ''}" data-fstatus2="pago">✅ Pago</button>
-          <button class="f-chip ${f.status==='vencido' ? 'sel-status-vencido' : ''}" data-fstatus2="vencido">⚠️ Vencido</button>
+        <div class="filter-group">
+          <label>Situação</label>
+          <div class="filter-chips">
+            <button class="f-chip ${f.status==='aberto'  ? 'sel-status-aberto'  : ''}" data-fstatus2="aberto">🕐 Em aberto</button>
+            <button class="f-chip ${f.status==='pago'    ? 'sel-status-pago'    : ''}" data-fstatus2="pago">✅ Pago</button>
+            <button class="f-chip ${f.status==='vencido' ? 'sel-status-vencido' : ''}" data-fstatus2="vencido">⚠️ Vencido</button>
+          </div>
         </div>
+        ${catGroupHtml}
       </div>
-      ${catGroupHtml}
     </div>
   </div>
 
@@ -1239,10 +1260,17 @@ function bind(){
   });
   onAll('[data-delcat]','click',el=>{ S.confirmDelete={type:'cat',id:el.dataset.delcat,catType:el.dataset.cattype};render(); });
 
+  // Filter panel toggle
+  on('#filterToggleBtn','click', e => {
+    // Don't toggle when clicking the clear button
+    if(e.target.closest('#clearFilterBtn')) return;
+    S.txFilterOpen = !S.txFilterOpen;
+    render();
+  });
+
   // Extrato filter chips
   onAll('[data-ftype]','click',el=>{
     S.txFilter.type = S.txFilter.type===el.dataset.ftype ? '' : el.dataset.ftype;
-    // clear category if it no longer belongs to selected type
     if(S.txFilter.type && S.txFilter.category){
       const cats = S.userData?.categories[S.txFilter.type]||[];
       if(!cats.find(c=>c.id===S.txFilter.category)) S.txFilter.category='';
@@ -1257,8 +1285,8 @@ function bind(){
     S.txFilter.category = S.txFilter.category===el.dataset.fcat ? '' : el.dataset.fcat;
     render();
   });
-  const clearFilters=()=>{ S.txFilter={type:'',status:'',category:''}; render(); };
-  on('#clearFilterBtn','click', clearFilters);
+  const clearFilters=()=>{ S.txFilter={type:'',status:'',category:''}; S.txFilterOpen=false; render(); };
+  on('#clearFilterBtn','click',  e=>{ e.stopPropagation(); clearFilters(); });
   on('#clearFilterBtn2','click', clearFilters);
 
   // Transactions
@@ -1322,54 +1350,16 @@ if('serviceWorker' in navigator){
 }
 
 // ══ INIT ══
-async function boot(session){
-  // Common logic to go from a session → loaded app
-  try {
-    S.currentUser = {
-      id:    session.user.id,
-      name:  session.user.user_metadata?.name || '',
-      email: session.user.email
-    };
-    await loadUserData(session.user.id);
-    S.screen = 'app';
-  } catch(err) {
-    console.error('boot error:', err);
-    S.screen = 'login';
-  }
-  S.loading = false;
-  render();
-}
-
 async function init(){
-  // ── Timeout fallback: 8s, then show login ──
-  const loadingTimeout = setTimeout(()=>{
-    if(S.loading){ S.loading=false; S.screen='login'; render(); }
-  }, 8000);
-
-  // ── Guard against double-loading (race between listener and getSession) ──
-  let booted = false;
-  const bootOnce = async (session) => {
-    if(booted) return;
-    booted = true;
-    clearTimeout(loadingTimeout);
-    if(session) { await boot(session); }
-    else         { S.screen='login'; S.loading=false; render(); }
-  };
-
-  // ── PRIMARY: onAuthStateChange (handles INITIAL_SESSION, TOKEN_REFRESHED, etc.) ──
+  // ── Step 1: register auth state listener for ONGOING changes ──
+  // (login, logout, token refresh happening AFTER the initial load)
   sb.auth.onAuthStateChange(async (event, session) => {
-    if(event === 'INITIAL_SESSION') {
-      // Fires on every page load — with or without a session
-      await bootOnce(session);
+    if(event === 'SIGNED_IN' && S.screen !== 'app'){
+      // User just logged in via tryLogin()
+      // tryLogin() already called boot(), so this is a no-op guard
       return;
     }
-    if(event === 'SIGNED_IN') {
-      // Fresh login — bootOnce may already have fired; if app isn't loaded yet, boot now
-      await bootOnce(session);
-      return;
-    }
-    if(event === 'TOKEN_REFRESHED' && session && S.screen === 'app') {
-      // Silent token refresh while app is running — update user, no full reload
+    if(event === 'TOKEN_REFRESHED' && session && S.screen === 'app'){
       S.currentUser = {
         id:    session.user.id,
         name:  session.user.user_metadata?.name || S.currentUser?.name || '',
@@ -1377,26 +1367,48 @@ async function init(){
       };
       return;
     }
-    if(event === 'SIGNED_OUT') {
-      booted = false;
+    if(event === 'SIGNED_OUT'){
       S.currentUser = null; S.userData = null;
       S.screen = 'login'; S.loading = false;
       render();
     }
   });
 
-  // ── FALLBACK: getSession() — in case INITIAL_SESSION doesn't fire (some mobile browsers) ──
-  // We wait 400ms to give onAuthStateChange priority
-  setTimeout(async () => {
-    if(booted) return; // already handled by listener
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      await bootOnce(session);
-    } catch(err) {
-      console.error('getSession fallback error:', err);
-      await bootOnce(null);
+  // ── Step 2: check existing session directly — most reliable across all browsers ──
+  // 5s hard timeout as last resort
+  const hardTimeout = setTimeout(()=>{
+    if(S.loading){ S.loading=false; S.screen='login'; render(); }
+  }, 5000);
+
+  try {
+    const { data, error } = await sb.auth.getSession();
+    clearTimeout(hardTimeout);
+    if(error) throw error;
+
+    if(data.session){
+      S.currentUser = {
+        id:    data.session.user.id,
+        name:  data.session.user.user_metadata?.name || '',
+        email: data.session.user.email
+      };
+      try {
+        await loadUserData(data.session.user.id);
+        S.screen = 'app';
+      } catch(loadErr){
+        console.error('loadUserData:', loadErr);
+        S.screen = 'login';
+      }
+    } else {
+      S.screen = 'login';
     }
-  }, 400);
+  } catch(err){
+    clearTimeout(hardTimeout);
+    console.error('getSession error:', err);
+    S.screen = 'login';
+  }
+
+  S.loading = false;
+  render();
 }
 init();
 </script>
