@@ -557,10 +557,10 @@ function renderBarChart(data, type){
   const maxVal   = Math.max(...values,1);
   const n        = data.length;
 
-  // SVG dimensions
-  const VW=340, VH=118, PX=6, PT=22, PB=18;
-  const CH=VH-PT-PB;
-  const GW=( VW-2*PX)/n;
+  // SVG dimensions — PT increased to 38 to fit two label lines above active bar
+  const VW=340, VH=132, PX=6, PT=38, PB=18;
+  const CH=VH-PT-PB;  // chart area height stays the same (76px)
+  const GW=(VW-2*PX)/n;
   const BW=Math.min(GW*0.58,38);
 
   // MoM comparison (current vs previous)
@@ -570,13 +570,14 @@ function renderBarChart(data, type){
   const curFmt  = fmt(cur);
   const prevFmt = fmt(prev);
 
+  // Pre-compute MoM values used both in bar labels and in footer
+  const isGood  = pct!==null ? (isIncome ? pct>=0 : pct<=0) : null;
+  const arrow   = pct!==null ? (pct>=0 ? '▲' : '▼') : '';
+  const momClr  = isGood===null ? 'var(--muted)' : (isGood ? '#26d4a0' : '#f0637a');
+  const absPct  = pct!==null ? Math.abs(pct).toFixed(1) : null;
+
   let momHtml='';
   if(pct!==null){
-    const isGood  = isIncome ? pct>=0 : pct<=0;
-    const arrow   = pct>=0 ? '▲' : '▼';
-    const momClr  = isGood  ? 'var(--grn)' : 'var(--red)';
-    const absPct  = Math.abs(pct).toFixed(1);
-    const absDiff = fmt(Math.abs(cur-prev));
     momHtml=`
     <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
       <div style="display:flex;align-items:center;gap:5px">
@@ -606,9 +607,13 @@ function renderBarChart(data, type){
     const cx   = (PX + i*GW + GW/2).toFixed(1);
     const dimmed = !d.active;
 
-    // Value label above bar (only if non-zero)
+    // Value label above bar
     const lbl  = v>0 ? fmtShort(v) : '';
     const lblY = (PT+CH-barH-5).toFixed(1);
+
+    // MoM % label — only on the active (current month) bar, above the value label
+    const pctLblY  = (PT+CH-barH-17).toFixed(1); // 12px above value label
+    const showPct  = d.active && absPct!==null;
 
     // Month label at bottom
     const mlbY = (VH-2).toFixed(1);
@@ -616,6 +621,9 @@ function renderBarChart(data, type){
     return `
     <rect x="${barX}" y="${barY}" width="${BW.toFixed(1)}" height="${barH.toFixed(1)}" rx="5"
           fill="url(#${gradId})" opacity="${dimmed?'0.35':'1'}"/>
+    ${showPct?`<text x="${cx}" y="${pctLblY}" text-anchor="middle"
+          font-size="8.5" font-weight="800" font-family="Syne,sans-serif"
+          fill="${momClr}">${arrow}${absPct}%</text>`:''}
     ${lbl?`<text x="${cx}" y="${lblY}" text-anchor="middle"
           font-size="8.5" font-weight="${d.active?'700':'500'}"
           font-family="DM Sans,sans-serif"
